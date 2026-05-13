@@ -53,7 +53,7 @@ None of the above? → Standard workflow is fine ✓
 
 ## How It Works
 
-**7-phase claude code workflow for high-stakes backend feature development:**
+**7-phase Claude Code workflow for high-stakes backend feature development:**
 
 ```
 ① Requirements & Design    → brainstorming skill
