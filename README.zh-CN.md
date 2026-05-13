@@ -4,22 +4,21 @@
 
 # ⚡ MageByte Power Skills
 
-**把 4 年生产踩坑经验「蒸馏」成可复用的 Claude Code Superpowers Skills**
-
-每一行 SKILL.md 背后，都是一次真实发生过的线上事故。
+**为高风险后端特性设计的 Claude Code Skill — 4 轮 AI 交叉验证，在生产前拦截并发与幂等 bug**
 
 <br/>
 
 [![GitHub Stars](https://img.shields.io/github/stars/MageByte-Zero/magebyte-power?style=social)](https://github.com/MageByte-Zero/magebyte-power/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT%20%E2%80%94%20Use%20it%2C%20modify%20it%2C%20share%20it-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Compatible-8B5CF6?logo=anthropic&logoColor=white)](https://claude.ai/code)
+[![Last Commit](https://img.shields.io/github/last-commit/MageByte-Zero/magebyte-power)](https://github.com/MageByte-Zero/magebyte-power/commits/main)
 [![English](https://img.shields.io/badge/README-English-blue)](README.md)
 
 </div>
 
 ---
 
-## 先说一个故事
+## 为什么做这个
 
 > 2024 年，我们一个支付退款接口上线两小时后出了问题：**用户重复收到退款**。
 >
@@ -29,32 +28,63 @@
 
 这就是我开发这个 Skill 的起点。
 
+**这个工作流用 4 轮独立 AI 验证解决这个问题：**
+
+- 🔍 **每次冷评审发现 5–15 个并发 / 幂等 bug** — reviewer 只拿到代码，不拿设计文档
+- ⚡ **4.3–4.5 阶段并行执行** — 行为 diff、跨仓库扫描、业务不变式同时跑
+- 🏗️ **无需额外插件** — 每个阶段都有 Claude Code 原生工具的 fallback
+
 ---
 
-## 这是什么
-
-一套专为 Claude Code 原生 Skills 生态设计的**领域增强 Skills 库**。
-
-Superpowers 提供了通用的 AI 工程 skill：`brainstorming`、`writing-plans`、`code-reviewer`、`systematic-debugging`、`subagent-driven-development`……
-
-**本仓库做的是编排层**：在正确的阶段、以正确的信息范围调用这些通用 skill，封装成一个领域专属的完整工作流。你不需要手动把各个 skill 串起来——直接触发，剩下的交给 AI 自动完成。
+## 什么时候该用
 
 ```
-你（用户 prompt）
-    │
-    ▼
-cross-verified-feature-development   ← 本仓库
-    │
-    ├── 阶段 1    →  superpowers:brainstorming        需求分析 → 结构化 spec
-    ├── 阶段 2    →  superpowers:writing-plans         spec → 可执行 task 清单
-    ├── 阶段 3    →  superpowers:subagent-driven-dev   每个 task 独立 subagent 实施
-    ├── 阶段 4.1  →  superpowers:systematic-debugging  自查：以「假设有 bug」角度扫描
-    ├── 阶段 4.2  →  superpowers:code-reviewer         冷评审：reviewer 不读设计文档 ⭐
-    ├── 阶段 4.3–4.5 → 自定义 agent                  行为 diff / 跨仓库扫描 / 业务不变式
-    └── 阶段 5    →  writing-plans + subagent-dev      修复迭代，与实施同等严谨度
+特性是否命中以下任一项？
+│
+├── 💰 资金流 / 支付 / 退款 / 结算？                    → 是 → 走本工作流
+├── 🔄 订单 / 库存状态机，有状态转换逻辑？               → 是 → 走本工作流
+├── 🔒 分布式锁 / 并发控制 / 幂等重试？                  → 是 → 走本工作流
+├── 🔗 跨服务 MQ/RPC 协议或共享 proto/model 变更？       → 是 → 走本工作流
+├── 🗄️ 在线 schema 迁移或双写切换策略？                  → 是 → 走本工作流
+└── ⏱️ 预估工作量 ≥ 3 人日，且失败代价高？              → 是 → 走本工作流
+
+以上都不命中？ → 普通工作流即可 ✓
 ```
 
-**没有 Superpowers 也能用**——每个阶段都有完整的 fallback 模式。
+**一句话判定**：如果「这个 feature 最坏的 bug 会怎样」的答案包含**资金损失 / 数据错乱 / 订单卡死 / 权限越权**，就值得走本工作流。
+
+---
+
+## 怎么运作的
+
+**7 阶段高风险后端特性开发工作流：**
+
+```
+① 需求/设计          → brainstorming skill
+①.5 架构决策评审     → ADR：高风险特性必做
+② 实施计划           → writing-plans skill
+③ 实施              → subagent-driven-development skill
+④ 🔥 4 轮独立交叉验证 ← 核心创新
+⑤ 迭代修复           → writing-plans + subagent-driven-development
+⑥ 谨慎简化           → 带怀疑的优化 + anti-patterns 清单
+⑦ 文档同步           → 强制回填 evolution log
+```
+
+**4 轮 AI 独立验证：**
+
+| 轮次 | 视角 | 典型产出 |
+|------|------|---------|
+| 4.1 系统自查 | 自己扮演 bug 猎人 | 1–3 个 bug |
+| **4.2 冷上下文评审 ⭐** | **不读设计文档**的独立 AI reviewer | **5–15 个并发 / 幂等 bug** |
+| 4.3 行为保持 diff | 对比 master vs feature 副作用 | 2–5 处语义回归 |
+| 4.4 跨仓库影响扫描 | 识别其他服务联动影响 | 0–3 个外部影响点 |
+| 4.5 业务不变式矩阵 | 验证资金 / 状态机 / 库存硬约束 | 0–2 个不变式被破坏 |
+
+> **4.2 冷上下文评审是价值密度最高的步骤。** Reviewer 只拿到代码，不拿设计文档——这才是真正独立的视角，也最接近生产环境里陌生工程师维护你代码时的状态。
+
+![单一视角 Review 盲点 vs 多轮独立验证](images/cross-verified-skill-intro/review-blindspot-diagram.png)
+
+4.3–4.5 支持并行 dispatch 多个 subagent，时间开销几乎不叠加。
 
 ---
 
@@ -164,7 +194,7 @@ $cross-verified-feature-development 实现幂等退款接口
 
 > **设计 → 实施 → 4 轮独立 AI 交叉验证 → 修复 → 谨慎简化 → 文档同步**
 
-![单一视角 Review 盲点 vs 多轮独立验证](images/cross-verified-skill-intro/review-blindspot-diagram.png)
+![4 轮独立视角验证对比](images/cross-verified-skill-intro/4-rounds-comparison.png)
 
 ### 7 个阶段
 
@@ -182,40 +212,6 @@ $cross-verified-feature-development 实现幂等退款接口
 每个阶段都有明确的 Exit Criteria（完成标准检查列表），不满足不能进入下一阶段。
 
 ![7 阶段工作流](images/cross-verified-skill-intro/7-phase-workflow.png)
-
-### 第 4 阶段：4 轮独立验证（核心创新）
-
-| 轮次 | 视角 | 信息范围 | 典型产出 |
-|------|------|---------|---------|
-| **4.1 系统自查** | 自己扮演 bug 猎人 | 完整上下文 | 1–3 个已有 bug |
-| **4.2 冷上下文评审 ⭐** | **不读设计文档**的独立 reviewer | 仅看代码本身 | **5–15 个并发 / 幂等 bug** |
-| **4.3 行为保持 diff** | 对比 master vs feature 全部副作用 | diff + 依赖图 | 2–5 处语义回归 |
-| **4.4 跨仓库影响扫描** | 识别其他服务的联动影响 | 多仓库调用图 | 0–3 个外部影响点 |
-| **4.5 业务不变式矩阵** | 验证资金 / 状态机 / 库存的硬约束 | 业务规则文档 | 0–2 个不变式被破坏 |
-
-> **4.2 冷上下文评审是价值密度最高的步骤。**
-> Reviewer 只拿到代码，不拿设计文档——这才是真正「独立视角」的评审，也是最接近生产环境里陌生工程师维护你代码时的状态。
-
-![4 轮独立视角验证对比](images/cross-verified-skill-intro/4-rounds-comparison.png)
-
-4.3–4.5 支持并行 dispatch 多个 subagent，时间开销几乎不叠加。
-
-### 什么时候该用
-
-```
-特性是否命中以下任一项？
-│
-├── 💰 资金流 / 支付 / 退款 / 结算？                    → 是 → 走本工作流
-├── 🔄 订单 / 库存状态机，有状态转换逻辑？               → 是 → 走本工作流
-├── 🔒 分布式锁 / 并发控制 / 幂等重试？                  → 是 → 走本工作流
-├── 🔗 跨服务 MQ/RPC 协议或共享 proto/model 变更？       → 是 → 走本工作流
-├── 🗄️ 在线 schema 迁移或双写切换策略？                  → 是 → 走本工作流
-└── ⏱️ 预估工作量 ≥ 3 人日，且失败代价高？              → 是 → 走本工作流
-
-以上都不命中？ → 普通工作流即可 ✓
-```
-
-**一句话判定**：如果「这个 feature 最坏的 bug 会怎样」的答案包含**资金损失 / 数据错乱 / 订单卡死 / 权限越权**，就值得走本工作流。
 
 ### 成本 vs 收益
 
@@ -296,3 +292,8 @@ PR 中请说明：这个 Skill 解决了什么真实场景的问题，以及你�
 Maintainer: [MageByte-Zero](https://github.com/MageByte-Zero) · [MIT License](LICENSE) · [English README](README.md)
 
 </div>
+
+<!-- awesome list entry:
+[magebyte-power](https://github.com/MageByte-Zero/magebyte-power) —
+Claude Code skill for high-stakes backend features — 4-round AI review catches concurrency & idempotency bugs before prod
+-->
