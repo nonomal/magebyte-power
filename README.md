@@ -4,7 +4,7 @@
 
 # ⚡ MageByte Power Skills
 
-**Claude Code skill for high-stakes backend features — 4-round AI review catches concurrency & idempotency bugs before prod**
+**Claude Code skills for high-stakes backend features — codebase-aware task breakdown + 4-round AI verification**
 
 <br/>
 
@@ -88,6 +88,7 @@ Passes 4.3–4.5 are dispatched in parallel via subagents.
 
 | Skill | What it does | When to use |
 |-------|-------------|-------------|
+| [`prd-to-tasks`](#prd-to-tasks) | PRD → **codebase-aware task breakdown** with risk-driven workflow routing | Any PRD or requirements doc that needs to be translated into concrete engineering tasks |
 | [`cross-verified-feature-development`](#cross-verified-feature-development) | 7-phase workflow with **4 independent AI verification passes** | Payments, state machines, distributed locks, cross-service contracts, schema migrations |
 
 ---
@@ -117,16 +118,22 @@ export SKILLS_REPO="$PWD/magebyte-power"
 mkdir -p ~/.claude/skills
 ln -sf "$SKILLS_REPO/skills/cross-verified-feature-development" \
        ~/.claude/skills/cross-verified-feature-development
+ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
+       ~/.claude/skills/prd-to-tasks
 
 # Codex CLI
 mkdir -p ~/.agents/skills
 ln -sf "$SKILLS_REPO/skills/cross-verified-feature-development" \
        ~/.agents/skills/cross-verified-feature-development
+ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
+       ~/.agents/skills/prd-to-tasks
 
 # OpenClaw
 mkdir -p ~/.openclaw/skills
 ln -sf "$SKILLS_REPO/skills/cross-verified-feature-development" \
        ~/.openclaw/skills/cross-verified-feature-development
+ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
+       ~/.openclaw/skills/prd-to-tasks
 ```
 
 > **Cross-platform tip:** `~/.agents/skills/` is the standard user-scoped directory in the Open Agent Skills ecosystem. Claude Code, Codex CLI, and OpenClaw all scan it automatically — install once, works across all three.
@@ -157,20 +164,68 @@ See [opencode.ai/docs/agents](https://opencode.ai/docs/agents) for the full form
 ```bash
 # Claude Code
 ls ~/.claude/skills/cross-verified-feature-development/SKILL.md
+ls ~/.claude/skills/prd-to-tasks/SKILL.md
 
 # Codex CLI / OpenClaw (shared path)
 ls ~/.agents/skills/cross-verified-feature-development/SKILL.md
+ls ~/.agents/skills/prd-to-tasks/SKILL.md
 ```
 
 **Usage:**
 
 ```bash
-# Claude Code
-/cross-verified-workflow implement idempotent refund API with distributed lock
+# prd-to-tasks — paste a PRD link or describe the requirement
+"help me break down this PRD into tasks"
+"turn this requirements doc into engineering tasks"
 
-# Codex CLI / OpenClaw
-$cross-verified-feature-development implement idempotent refund API
+# cross-verified-feature-development
+/cross-verified-workflow implement idempotent refund API with distributed lock
 ```
+
+---
+
+## prd-to-tasks
+
+### The core problem
+
+PRD documents describe *what* to build. They don't tell you *where* in the codebase to build it, which services are affected, or what patterns are required. The gap between "PM handed me a doc" and "I have executable tasks with file paths and verify commands" is where hours disappear.
+
+**This skill closes that gap with a 5-phase structured pipeline:**
+
+```
+Phase 0: PRD Ingestion      → Feishu/Lark URL, pasted text, or local file
+Phase 1: Scope & Risk       → Map to affected services, classify 🔴/🟡/🟢 (gate)
+Phase 2: Codebase Scan      → Locate real file paths, interfaces, DB tables
+Phase 3: Spec Generation    → Structured design doc with invariants & failure modes (gate)
+Phase 4: Task Breakdown      → Tasks with file paths, line numbers, verify commands (gate)
+Phase 5: Workflow Routing   → Auto-route to cross-verified or standard superpowers flow
+```
+
+### What makes tasks different
+
+Generic spec tools produce: *"implement user login → modify UserService"*
+
+This skill produces:
+> In the `CreateBooking` method at `order-service/internal/service/booking/booking_service.go:142`, add a feature flag check with key `platform_order_v2_enabled`, use `idgen.NextID()` to generate the new record ID, write to `db.WriteDB`, then execute `cache.DoubleDelete(ctx, key)` after the write — `make build && make test`.
+
+### Risk routing
+
+| Risk level | Criteria | Routes to |
+|-----------|----------|-----------|
+| 🔴 Critical | Financial flows, state machines, distributed locks, MQ contracts, schema migration | `cross-verified-feature-development` |
+| 🟡 High | ≥ 3 person-days, multi-repo, core order path | `brainstorming` → `writing-plans` → `subagent-driven-development` |
+| 🟢 Standard | New endpoints, stateless, single repo, < 3 days | `writing-plans` → implement |
+
+### Setup required
+
+`references/repo-map.md` is a team-customizable service map — replace the placeholder service names with your actual repos and services. **Accuracy here directly affects task quality.**
+
+### Bundled reference files
+
+| File | When to read |
+|------|-------------|
+| `references/service-patterns.md` | Phase 4 — 8 Go microservice patterns every task should check |
+| `references/repo-map.md` | Phase 1 — customize with your team's services and repos |
 
 ---
 
