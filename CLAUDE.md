@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Repo Is
 
-A collection of [Claude Code Superpowers](https://superpowers.anthropic.com/) skills — battle-tested workflows, development methodologies, and prompt templates packaged as reusable units that Claude Code loads on demand.
+A collection of Claude Code skills — battle-tested workflows, development methodologies, and prompt templates packaged as reusable units that Claude Code loads on demand.
 
 ## Repo Structure
 
