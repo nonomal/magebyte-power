@@ -11,7 +11,7 @@ Every line of SKILL.md is backed by a real production outage.
 <br/>
 
 [![GitHub Stars](https://img.shields.io/github/stars/MageByte-Zero/magebyte-power?style=social)](https://github.com/MageByte-Zero/magebyte-power/stargazers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT%20%E2%80%94%20Use%20it%2C%20modify%20it%2C%20share%20it-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Compatible-8B5CF6?logo=anthropic&logoColor=white)](https://claude.ai/code)
 [![中文文档](https://img.shields.io/badge/文档-中文版（推荐）-red)](README.zh-CN.md)
 
