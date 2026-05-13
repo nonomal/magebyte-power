@@ -4,7 +4,7 @@
 
 # ⚡ MageByte Power Skills
 
-**为高风险后端特性设计的 Claude Code Skill — 4 轮 AI 交叉验证，在生产前拦截并发与幂等 bug**
+**为高风险后端特性设计的 Claude Code Skills — 代码库感知的任务拆解 + 4 轮 AI 交叉验证**
 
 <br/>
 
@@ -92,9 +92,10 @@
 
 | Skill | 核心价值 | 适用场景 |
 |-------|---------|---------|
+| [`prd-to-tasks`](#prd-to-tasks-详解) | PRD → **代码库感知的任务拆解** + 风险路由 | 任何 PRD / 需求文档 → 可执行工程任务的转化 |
 | [`cross-verified-feature-development`](#cross-verified-feature-development-详解) | 7 阶段工作流 + **4 轮独立 AI 交叉验证** | 支付 / 状态机 / 并发控制 / 跨服务改造 / schema 迁移 |
 
-> 更多 Skill 正在根据生产事故持续沉淀中。欢迎 Star 关注更新。
+> 更多 Skill 正在根据生产实践持续沉淀中。欢迎 Star 关注更新。
 
 ---
 
@@ -123,16 +124,22 @@ export SKILLS_REPO="$PWD/magebyte-power"
 mkdir -p ~/.claude/skills
 ln -sf "$SKILLS_REPO/skills/cross-verified-feature-development" \
        ~/.claude/skills/cross-verified-feature-development
+ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
+       ~/.claude/skills/prd-to-tasks
 
 # Codex CLI
 mkdir -p ~/.agents/skills
 ln -sf "$SKILLS_REPO/skills/cross-verified-feature-development" \
        ~/.agents/skills/cross-verified-feature-development
+ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
+       ~/.agents/skills/prd-to-tasks
 
 # OpenClaw
 mkdir -p ~/.openclaw/skills
 ln -sf "$SKILLS_REPO/skills/cross-verified-feature-development" \
        ~/.openclaw/skills/cross-verified-feature-development
+ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
+       ~/.openclaw/skills/prd-to-tasks
 ```
 
 > **跨平台通用路径提示：** `~/.agents/skills/` 是 Open Agent Skills 生态的标准用户目录，Claude Code、Codex CLI、OpenClaw 均会自动扫描——安装到这里一次，三端同时生效。
@@ -163,22 +170,70 @@ mkdir -p ~/.config/opencode/agents
 ```bash
 # Claude Code
 ls ~/.claude/skills/cross-verified-feature-development/SKILL.md
+ls ~/.claude/skills/prd-to-tasks/SKILL.md
 
 # Codex CLI / OpenClaw 通用路径
 ls ~/.agents/skills/cross-verified-feature-development/SKILL.md
+ls ~/.agents/skills/prd-to-tasks/SKILL.md
 ```
 
 **触发方式**
 
 ```bash
-# Claude Code
-/cross-verified-workflow 实现支付退款接口，需要保证幂等性和并发安全
+# prd-to-tasks — 粘贴 PRD 链接或描述需求
+"帮我把这个 PRD 拆成任务"
+"把这个需求文档转成工程任务清单"
 
-# Codex CLI / OpenClaw
-$cross-verified-feature-development 实现幂等退款接口
+# cross-verified-feature-development
+/cross-verified-workflow 实现支付退款接口，需要保证幂等性和并发安全
 ```
 
-或者直接描述高风险特性，Skill 会自动检测相关模式并主动建议使用本工作流。
+或者直接描述需求 / 高风险特性，Skill 会自动识别并触发。
+
+---
+
+## prd-to-tasks 详解
+
+### 核心问题：PRD 到代码之间的鸿沟
+
+需求文档描述的是「做什么」，不告诉你「在哪里做」——哪些服务受影响、要改哪些文件、要检查哪些模式。从「PM 发来一个文档」到「我手里有一份带文件路径和验证命令的可执行任务清单」，这中间的时间通常花在漫无目的地翻代码上。
+
+**这个 Skill 用 5 阶段结构化流水线解决这个问题：**
+
+```
+Phase 0: PRD 摄取      → Feishu/Lark 链接、粘贴文本或本地文件
+Phase 1: 范围 + 风险定级 → 映射受影响服务，定级 🔴/🟡/🟢（门控）
+Phase 2: 代码库扫描    → 定位真实文件路径、接口、DB 表
+Phase 3: Spec 生成     → 含不变式和失败模式的结构化设计文档（门控）
+Phase 4: 任务拆解      → 带文件路径 + 行号 + 验证命令的可执行任务（门控）
+Phase 5: 工作流路由    → 自动路由到 cross-verified 或 superpowers 标准流程
+```
+
+### 任务质量的差异
+
+通用 spec 工具产出的是：*「实现用户登录 → 修改 UserService」*
+
+本 Skill 产出的是：
+> 在 `order-service/internal/service/booking/booking_service.go:142` 的 `CreateBooking` 方法中加入 feature flag 检查，flag key 为 `platform_order_v2_enabled`，用 `idgen.NextID()` 生成新单据 ID，写 `db.WriteDB`，写后执行 `cache.DoubleDelete(ctx, key)` — `make build && make test`。
+
+### 风险路由
+
+| 风险层级 | 判定标准 | 路由到 |
+|---------|---------|-------|
+| 🔴 Critical | 资金流、状态机、分布式锁、MQ 协议变更、schema 迁移 | `cross-verified-feature-development` |
+| 🟡 High | ≥ 3 人日、多仓库联动、核心订单路径改造 | `brainstorming` → `writing-plans` → `subagent-driven-development` |
+| 🟢 Standard | 纯新增接口、无状态机语义、单仓库、< 3 人日 | `writing-plans` → 直接实施 |
+
+### 安装后必做一步
+
+`references/repo-map.md` 是一份服务映射模板——把里面的占位服务名替换成你团队的真实仓库和服务名。**这里的准确度直接决定任务拆解的质量。**
+
+### 内含参考文件
+
+| 文件 | 何时读 | 内容 |
+|------|-------|------|
+| `references/service-patterns.md` | Phase 4 拆任务时 | 8 个 Go 微服务代码模式（每个任务应检查的清单）|
+| `references/repo-map.md` | Phase 1 识别受影响服务时 | 团队自定义的服务 → 仓库映射表 |
 
 ---
 
