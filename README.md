@@ -13,7 +13,6 @@ Every line of SKILL.md is backed by a real production outage.
 [![GitHub Stars](https://img.shields.io/github/stars/MageByte-Zero/magebyte-power?style=social)](https://github.com/MageByte-Zero/magebyte-power/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Compatible-8B5CF6?logo=anthropic&logoColor=white)](https://claude.ai/code)
-[![Superpowers](https://img.shields.io/badge/Superpowers-Enhanced-FF6B35)](https://superpowers.anthropic.com/)
 [![中文文档](https://img.shields.io/badge/文档-中文版（推荐）-red)](README.zh-CN.md)
 
 </div>
@@ -24,7 +23,7 @@ Every line of SKILL.md is backed by a real production outage.
 
 ## What is this?
 
-A library of **domain-specific orchestration skills** for the [Claude Code Superpowers](https://superpowers.anthropic.com/) ecosystem.
+A library of **domain-specific orchestration skills** for the Claude Code native skills ecosystem.
 
 Superpowers provides general-purpose engineering skills: `brainstorming`, `writing-plans`, `code-reviewer`, `systematic-debugging`, `subagent-driven-development`. This repo wires them together into opinionated, field-tested workflows for specific high-stakes domains — so you get the full power of the ecosystem without manually chaining skills together.
 
@@ -114,15 +113,6 @@ mkdir -p ~/.config/opencode/agents
 See [opencode.ai/docs/agents](https://opencode.ai/docs/agents) for the full format spec.
 
 </details>
-
-**Step 3 (Claude Code only): Install Superpowers**
-
-```bash
-npm install -g @anthropic-ai/claude-code
-claude mcp add --transport http superpowers https://superpowers.anthropic.com/mcp
-```
-
-Codex CLI / OpenClaw / OpenCode users can skip this — every phase has a documented fallback.
 
 **Verify:**
 

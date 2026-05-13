@@ -13,7 +13,6 @@
 [![GitHub Stars](https://img.shields.io/github/stars/MageByte-Zero/magebyte-power?style=social)](https://github.com/MageByte-Zero/magebyte-power/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Compatible-8B5CF6?logo=anthropic&logoColor=white)](https://claude.ai/code)
-[![Superpowers](https://img.shields.io/badge/Superpowers-Enhanced-FF6B35?logo=lightning&logoColor=white)](https://superpowers.anthropic.com/)
 [![English](https://img.shields.io/badge/README-English-blue)](README.md)
 
 </div>
@@ -34,7 +33,7 @@
 
 ## 这是什么
 
-一套专为 [Claude Code Superpowers](https://superpowers.anthropic.com/) 生态设计的**领域增强 Skills 库**。
+一套专为 Claude Code 原生 Skills 生态设计的**领域增强 Skills 库**。
 
 Superpowers 提供了通用的 AI 工程 skill：`brainstorming`、`writing-plans`、`code-reviewer`、`systematic-debugging`、`subagent-driven-development`……
 
@@ -128,18 +127,6 @@ mkdir -p ~/.config/opencode/agents
 详细格式参考：[opencode.ai/docs/agents](https://opencode.ai/docs/agents)
 
 </details>
-
-**第三步（Claude Code 专属）：安装 Superpowers 插件**
-
-```bash
-# 安装 Claude Code（如还没装）
-npm install -g @anthropic-ai/claude-code
-
-# 安装 Superpowers（推荐，首次需 Anthropic 账号授权）
-claude mcp add --transport http superpowers https://superpowers.anthropic.com/mcp
-```
-
-Codex CLI / OpenClaw / OpenCode 用户可跳过此步，每个阶段都有完整的 fallback 模式。
 
 **验证安装**
 
@@ -251,18 +238,16 @@ $cross-verified-feature-development 实现幂等退款接口
 
 ---
 
-## 与 Superpowers 生态的关系
+## 与通用 Skills 生态的关系
 
-[Superpowers](https://superpowers.anthropic.com/) 是 Anthropic 官方的 Claude Code MCP 插件，提供通用工程 skills。
+本仓库的 Skill 是**领域增强层**，可与通用工程 skill（`brainstorming`、`writing-plans`、`systematic-debugging` 等）配合使用：
 
-如果你已经在用 Superpowers，本仓库的 Skill 是**天然的垂直增强层**：
-
-- Superpowers 告诉 Claude「如何思考」（brainstorming、planning、debugging）
+- 通用 skill 告诉 Claude「如何思考」（brainstorming、planning、debugging）
 - 本仓库告诉 Claude「在高风险后端特性开发中，每个阶段具体该做什么」
 
 两者叠加，才能实现从「AI 辅助」到「AI 主导严谨工程流程」的真正跃迁。
 
-> **没有 Superpowers 也能用**——每个阶段都有详细的 fallback 说明。
+> **没有通用 skill 也能用**——每个阶段都有详细的 fallback 说明。
 
 ---
 
