@@ -4,15 +4,14 @@
 
 # ⚡ MageByte Power Skills
 
-**Production-incident-distilled Claude Code Superpowers Skills**
-
-Every line of SKILL.md is backed by a real production outage.
+**Claude Code skill for high-stakes backend features — 4-round AI review catches concurrency & idempotency bugs before prod**
 
 <br/>
 
 [![GitHub Stars](https://img.shields.io/github/stars/MageByte-Zero/magebyte-power?style=social)](https://github.com/MageByte-Zero/magebyte-power/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT%20%E2%80%94%20Use%20it%2C%20modify%20it%2C%20share%20it-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Compatible-8B5CF6?logo=anthropic&logoColor=white)](https://claude.ai/code)
+[![Last Commit](https://img.shields.io/github/last-commit/MageByte-Zero/magebyte-power)](https://github.com/MageByte-Zero/magebyte-power/commits/main)
 [![中文文档](https://img.shields.io/badge/文档-中文版（推荐）-red)](README.zh-CN.md)
 
 </div>
@@ -21,28 +20,67 @@ Every line of SKILL.md is backed by a real production outage.
 
 ---
 
-## What is this?
+## Why This Exists
 
-A library of **domain-specific orchestration skills** for the Claude Code native skills ecosystem.
+A payment refund API passed two code reviews — including the author's own — and still shipped with a concurrency race condition. Users got double-refunded within two hours of launch.
 
-Superpowers provides general-purpose engineering skills: `brainstorming`, `writing-plans`, `code-reviewer`, `systematic-debugging`, `subagent-driven-development`. This repo wires them together into opinionated, field-tested workflows for specific high-stakes domains — so you get the full power of the ecosystem without manually chaining skills together.
+The root cause wasn't carelessness. **Code review has a structural blind spot**: every reviewer shares the author's design assumptions. The more context you give reviewers, the harder it is for them to spot holes in your belief system.
+
+**This workflow fixes that with 4 independent AI verification passes:**
+
+- 🔍 **Catches 5–15 concurrency & idempotency bugs per review** — by an AI that sees only the code, not the design doc
+- ⚡ **Parallel subagents for phases 4.3–4.5** — behavior diff, cross-repo scan, and business invariant check run simultaneously
+- 🏗️ **No extra plugins required** — every phase has a built-in fallback using Claude Code's native tools
+
+---
+
+## When To Use
 
 ```
-Your prompt
-    │
-    ▼
-cross-verified-feature-development   ← this repo
-    │
-    ├── Phase 1    →  superpowers:brainstorming
-    ├── Phase 2    →  superpowers:writing-plans
-    ├── Phase 3    →  superpowers:subagent-driven-development
-    ├── Phase 4.1  →  superpowers:systematic-debugging
-    ├── Phase 4.2  →  superpowers:code-reviewer  (cold-context — no design docs) ⭐
-    ├── Phase 4.3–4.5 → custom agents            behavior diff / cross-repo / invariants
-    └── Phase 5    →  writing-plans + subagent-driven-development
+Does the feature involve any of the following?
+
+├── 💰 Financial transactions, payments, refunds, settlements?      → YES → Use this workflow
+├── 🔄 Order / inventory state machines with status transitions?    → YES → Use this workflow
+├── 🔒 Distributed locks, concurrency control, idempotent retry?    → YES → Use this workflow
+├── 🔗 Cross-service MQ/RPC contracts or shared proto/model change? → YES → Use this workflow
+├── 🗄️ Online schema migration or dual-write strategy?              → YES → Use this workflow
+└── ⏱️ Estimated effort ≥ 3 person-days with high cost-of-failure?  → YES → Use this workflow
+
+None of the above? → Standard workflow is fine ✓
 ```
 
-**Works without Superpowers** — every phase has a documented fallback using Claude Code's built-in tools.
+---
+
+## How It Works
+
+**7-phase claude code workflow for high-stakes backend feature development:**
+
+```
+① Requirements & Design    → brainstorming skill
+①.5 Architecture Review    → ADR (required for high-risk features)
+② Implementation Plan      → writing-plans skill
+③ Implementation           → subagent-driven-development skill
+④ 🔥 4 Cross-Verification Passes   ← the core innovation
+⑤ Fix Iteration            → writing-plans + subagent-driven-development
+⑥ Careful Simplification   → skeptical optimization with anti-pattern checklist
+⑦ Doc Sync                 → backfill evolution log + notify downstream
+```
+
+**The 4 AI verification passes:**
+
+| Pass | Perspective | Typical yield |
+|------|-------------|--------------|
+| 4.1 Systematic self-review | Author as bug hunter | 1–3 bugs |
+| **4.2 Cold-context review ⭐** | **AI reviewer with no design docs** | **5–15 concurrency / idempotency bugs** |
+| 4.3 Behavior-preservation diff | Side-effect comparison vs master | 2–5 regressions |
+| 4.4 Cross-repo impact scan | External services that may break | 0–3 impact points |
+| 4.5 Business invariant matrix | Hard constraints: money / state / inventory | 0–2 violations |
+
+> **Phase 4.2 is the highest-value step.** The AI reviewer sees only the code — not the design doc assumptions baked in by the author. That's exactly where systematic concurrency and idempotency bugs hide.
+
+![Single-perspective review blind spot vs multi-round independent verification](images/cross-verified-skill-intro/review-blindspot-diagram.png)
+
+Passes 4.3–4.5 are dispatched in parallel via subagents.
 
 ---
 
@@ -146,38 +184,7 @@ Code Review has a structural blind spot: every reviewer shares the same design a
 
 > Design → Implement → **4 independent AI verification passes** → Fix → Simplify → Sync docs
 
-![Single-perspective review blind spot vs multi-round independent verification](images/cross-verified-skill-intro/review-blindspot-diagram.png)
-
-### The 4 verification passes
-
-| Pass | Perspective | Information scope | Typical yield |
-|------|-------------|-------------------|--------------|
-| 4.1 Systematic self-review | Author as bug hunter | Full context | 1–3 bugs |
-| **4.2 Cold-context review ⭐** | **Reviewer with no design docs** | Code only | **5–15 concurrency / idempotency bugs** |
-| 4.3 Behavior-preservation diff | Side-effect comparison vs master | Diff + dependency graph | 2–5 regressions |
-| 4.4 Cross-repo impact scan | External services that may need changes | Multi-repo call graph | 0–3 impact points |
-| 4.5 Business invariant matrix | Hard constraints: money / state / inventory | Business rules | 0–2 violations |
-
-> **Phase 4.2 is the highest-value step.** Typical yield: 5–15 Critical/High bugs per review that standard code review systematically misses — because the reviewer only sees the code, not the assumptions the author embedded in the design doc.
-
 ![4-round cross-verification comparison](images/cross-verified-skill-intro/4-rounds-comparison.png)
-
-Passes 4.3–4.5 are dispatched in parallel via subagents.
-
-### When to use
-
-```
-Does the feature involve any of the following?
-
-├── 💰 Financial transactions, payments, refunds, settlements?      → YES → Use this workflow
-├── 🔄 Order / inventory state machines with status transitions?    → YES → Use this workflow
-├── 🔒 Distributed locks, concurrency control, idempotent retry?    → YES → Use this workflow
-├── 🔗 Cross-service MQ/RPC contracts or shared proto/model change? → YES → Use this workflow
-├── 🗄️ Online schema migration or dual-write strategy?              → YES → Use this workflow
-└── ⏱️ Estimated effort ≥ 3 person-days with high cost-of-failure?  → YES → Use this workflow
-
-None of the above? → Standard workflow is fine ✓
-```
 
 ### The 7 phases
 
@@ -244,3 +251,8 @@ If this helped you, a **⭐ Star** goes a long way.
 Maintainer: [MageByte-Zero](https://github.com/MageByte-Zero) · [MIT License](LICENSE)
 
 </div>
+
+<!-- awesome list entry:
+[magebyte-power](https://github.com/MageByte-Zero/magebyte-power) —
+Claude Code skill for high-stakes backend features — 4-round AI review catches concurrency & idempotency bugs before prod
+-->
