@@ -274,7 +274,7 @@ The classification result determines the downstream workflow routing:
 | 风险层级 · Risk Level | 判定标准 · Criteria | 后续工作流 · Downstream Workflow |
 |----------------------|--------------------|---------------------------------|
 | 🔴 **Critical** | 资金流 / 退款 / 余额 / 状态机 / 分布式锁 / 跨服务 MQ 协议 / online schema 迁移 · Money flow / refunds / balance / state machine / distributed locks / cross-service MQ protocol / online schema migration | → `cross-verified-feature-development`（内含完整 9 阶段 superpowers 序列）|
-| 🟡 **High** | 估算 ≥ 3 人日 / 多仓库联动 / 核心订单路径改造 · Estimated ≥ 3 person-days / multi-repo coordination / core order path changes | → superpowers 标准序列：`brainstorming` → `writing-plans` → `test-driven-development` + `executing-plans` → `systematic-debugging` → `verification-before-completion` → `requesting-code-review` → `receiving-code-review` → `finishing-a-development-branch`（验收不通过回 writing-plans；review 重大问题回 debugging）|
+| 🟡 **High** | 估算 ≥ 3 人日 / 多仓库联动 / 核心订单路径改造 · Estimated ≥ 3 person-days / multi-repo coordination / core order path changes | → superpowers 标准序列：`brainstorming` → `writing-plans` → `test-driven-development` + `subagent-driven-development` → `systematic-debugging` → `verification-before-completion` → `requesting-code-review` → `receiving-code-review` → `finishing-a-development-branch`（验收不通过回 writing-plans；review 重大问题回 debugging）|
 | 🟢 **Standard** | 纯新增接口 / 无状态机语义 / 单仓库 / < 3 人日 · Pure new endpoints / no state machine semantics / single repo / < 3 person-days | → `direct`（用户直接读 spec + 任务清单实施 · user reads spec + tasks and implements directly） |
 
 **Phase 1 输出格式 · Phase 1 Output Format:**
@@ -589,8 +589,8 @@ graph TD
   T4 --> T5
 ```
 
-DAG 让用户一眼看出关键路径和可并行批次，也是 `superpowers:executing-plans` 的天然输入。
-The DAG shows critical path + parallelizable batches at a glance, and is the natural input for `superpowers:executing-plans`.
+DAG 让用户一眼看出关键路径和可并行批次，也是 `superpowers:subagent-driven-development` 的天然输入。
+The DAG shows critical path + parallelizable batches at a glance, and is the natural input for `superpowers:subagent-driven-development`.
 
 #### 4.1 任务格式 · Task Format
 
@@ -697,7 +697,7 @@ After the task list is approved, based on Phase 1.3 risk classification, **write
 │   ① superpowers:brainstorming          （如 spec 已够完整可跳过）
 │   ② superpowers:writing-plans          （spec + task 清单作为输入）
 │   ③ superpowers:test-driven-development
-│      + superpowers:executing-plans     （测试先行 + 按计划实施）
+│      + superpowers:subagent-driven-development     （测试先行 + 按计划实施）
 │   ④ superpowers:systematic-debugging   （实施后自查）
 │   ⑤ superpowers:verification-before-completion
 │      ↩ 验收不通过 → 回 ② writing-plans 重新规划
@@ -715,7 +715,7 @@ After the task list is approved, based on Phase 1.3 risk classification, **write
 | 下游 skill · Downstream | 如何读 plan header · How it reads the plan header |
 |------------------------|-------------------------------------------------|
 | `cross-verified-feature-development` | 校验 `routed-to == self`，读 `spec:` 文件作为 Phase 1 输入，任务清单作为 Phase 2 输入 · Verify `routed-to == self`, read `spec:` file as Phase 1 input, task list as Phase 2 input |
-| superpowers 标准序列（🟡 High）| 读 `spec:` + 任务清单作为输入，按序调用：`writing-plans` → `test-driven-development` + `executing-plans` → `systematic-debugging` → `verification-before-completion` → `requesting-code-review` → `receiving-code-review` → `finishing-a-development-branch` |
+| superpowers 标准序列（🟡 High）| 读 `spec:` + 任务清单作为输入，按序调用：`writing-plans` → `test-driven-development` + `subagent-driven-development` → `systematic-debugging` → `verification-before-completion` → `requesting-code-review` → `receiving-code-review` → `finishing-a-development-branch` |
 | `direct` | N/A — 无下游 skill。用户人肉读 spec + 任务清单直接实施 · N/A — no downstream skill. User reads spec + tasks and implements directly |
 
 #### 5.3 Phase 5 输出 · Phase 5 Output
@@ -738,7 +738,7 @@ Routed-to: cross-verified-feature-development   # 或 superpowers 标准序列
 ── 如果 🟡 High ──
 建议按顺序调用（每步完成后再调用下一个）· Call in sequence:
   1. /superpowers:writing-plans          （读 spec + 任务清单，产出实施计划）
-  2. /superpowers:test-driven-development + /superpowers:executing-plans  （测试先行 + 实施）
+  2. /superpowers:test-driven-development + /superpowers:subagent-driven-development  （测试先行 + 实施）
   3. /superpowers:systematic-debugging   （自查）
   4. /superpowers:verification-before-completion  （验收；不通过回 step 1）
   5. /superpowers:requesting-code-review → /superpowers:receiving-code-review  （重大问题回 step 3）

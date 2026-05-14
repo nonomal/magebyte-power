@@ -28,9 +28,9 @@ claude mcp add --transport http superpowers https://superpowers.anthropic.com/mc
 |-------|-------|------|
 | 1 | `superpowers:brainstorming` | 需求分析 → 结构化 spec |
 | 2 | `superpowers:writing-plans` | spec → 可执行 task 清单 |
-| 3 | `superpowers:test-driven-development` + `superpowers:executing-plans` | 测试先行 + 按计划执行每个 task |
+| 3 | `superpowers:test-driven-development` + `superpowers:subagent-driven-development` | 测试先行 + 每个 task 独立 subagent 实施 |
 | 4.1 | `superpowers:systematic-debugging` | 自查阶段的结构化调试框架 |
-| 5 | `superpowers:writing-plans` + `superpowers:executing-plans` | 修复迭代 |
+| 5 | `superpowers:writing-plans` + `superpowers:subagent-driven-development` | 修复迭代 |
 | 6 | `superpowers:verification-before-completion` | 验收：用证据证明每项完成标准 |
 | 7 | `superpowers:requesting-code-review` → `superpowers:receiving-code-review` | 提交审查 → 接收并处理 review 意见 |
 | 9 | `superpowers:finishing-a-development-branch` | 分支收尾：merge / PR / cleanup |
@@ -41,7 +41,7 @@ claude mcp add --transport http superpowers https://superpowers.anthropic.com/mc
 |-------|-------------|
 | Phase 1 | 手动撰写 spec 文档，确保包含：问题陈述、技术方案、不变式清单、失败模式分析、风险表格 |
 | Phase 2 | 手动拆 task 清单，每个 task 须有文件 + 行号 + 验证命令 |
-| Phase 3 | 先写失败测试，再逐 task 实施，每个 task 完成后做 self-review 再进下一个 |
+| Phase 3 | 先写失败测试，再逐 task 实施（用 `subagent-driven-development`），每个 task 完成后做 self-review 再进下一个 |
 | Phase 4.1 | 按 `references/cross-verification-techniques.md` 中的 4.1 checklist 手动自查 |
 | Phase 4.2–4.5 | 直接使用 `references/cross-verification-techniques.md` 里的 agent prompt 模板 dispatch subagent |
 | Phase 6 | 对照 spec 的 Success Criteria 逐项跑验证命令，无通过凭证不算完成 |
@@ -129,9 +129,9 @@ None of the above?  ──→  Standard workflow is fine ✓
 ① 需求/设计        → superpowers:brainstorming
 ①.5 架构决策评审   → ADR（高风险特性必做）
 ② 实施计划        → superpowers:writing-plans（含部署策略）
-③ 实施           → superpowers:test-driven-development + superpowers:executing-plans
+③ 实施           → superpowers:test-driven-development + superpowers:subagent-driven-development
 ④ 🔥 多轮交叉验证  ← 本 skill 的核心创新
-⑤ 迭代修复        → writing-plans round 2 + executing-plans（含回归保护）
+⑤ 迭代修复        → writing-plans round 2 + subagent-driven-development（含回归保护）
 ⑥ ✅ 验收          → superpowers:verification-before-completion
                       ↩ 验收不通过 → 回 Phase ② 重新规划
 ⑦ 👁 代码评审       → superpowers:requesting-code-review → receiving-code-review
@@ -221,7 +221,7 @@ None of the above?  ──→  Standard workflow is fine ✓
 
 **怎么做**：
 1. 先调用 `superpowers:test-driven-development`：对每个 task，**先写失败测试**，确认测试失败后再写实现。
-2. 再调用 `superpowers:executing-plans`：按 Phase 2 产出的 plan 驱动实施。每个 task：
+2. 再调用 `superpowers:subagent-driven-development`：按 Phase 2 产出的 plan 驱动实施。每个 task：
    - Dispatch implementer subagent（fresh context）
    - Implementer 自 review + commit
    - Dispatch spec compliance reviewer（验证是否建了要求的东西）
@@ -318,7 +318,7 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 
 **目标**：把 Phase 4 发现的问题修到干净。
 
-**怎么做**：把所有发现的 issue 汇总成一个新的 plan（`docs/superpowers/plans/YYYY-MM-DD-<feature>-review-fixes.md`），再走一遍 `writing-plans` + `executing-plans`（含 TDD：每个修复先写回归测试）。
+**怎么做**：把所有发现的 issue 汇总成一个新的 plan（`docs/superpowers/plans/YYYY-MM-DD-<feature>-review-fixes.md`），再走一遍 `writing-plans` + `subagent-driven-development`（含 TDD：每个修复先写回归测试）。
 
 **关键原则**：
 - **按严重程度分批**：Critical → High → Medium → Low
@@ -451,10 +451,10 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 |-------|------------|
 | 1 | `superpowers:brainstorming` |
 | 2 | `superpowers:writing-plans` |
-| 3 | `superpowers:test-driven-development` + `superpowers:executing-plans` |
+| 3 | `superpowers:test-driven-development` + `superpowers:subagent-driven-development` |
 | 4.1 | `superpowers:systematic-debugging` |
 | 4.2-4.5 | 自主 dispatch agent（本 skill 提供 prompt 模板，见 `references/cross-verification-techniques.md`）|
-| 5 | `superpowers:writing-plans` + `superpowers:executing-plans` |
+| 5 | `superpowers:writing-plans` + `superpowers:subagent-driven-development` |
 | 6 | `superpowers:verification-before-completion`（验收不通过 → 回 Phase 2）|
 | 7 | `superpowers:requesting-code-review` → `superpowers:receiving-code-review`（重大问题 → 回 Phase 4/5）|
 | 8 | 自主执行（附带 `anti-patterns.md` 警示）|
