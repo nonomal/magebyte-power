@@ -276,39 +276,64 @@ Discovered the following new mappings; no corresponding entries in KB. Append to
 基于摄取的 PRD + 代码扫描结果，生成结构化设计文档。
 Based on the ingested PRD + codebase scan results, generate a structured design document.
 
-**默认保存到 · Default save path**：`docs/specs/YYYY-MM-DD-<feature-name>.md`（in the primary affected repo）。
+**默认保存到 · Default save path**：`docs/superpowers/specs/YYYY-MM-DD-<feature>-design.md`（以 CWD 为根 · rooted at CWD）。
+
+下游 skill 凭固定路径取货（参见 Phase 5 路由 hand-off 契约）。
+Downstream skills consume by fixed path (see Phase 5 routing hand-off contract).
 
 **Spec 模板 · Spec Template:**
 
 ```markdown
+---
+feature: <kebab-case-name>
+prd-source: lark://docx/xxx 或 docs/prd/xxx.md 或 inline
+risk-level: 🔴 Critical | 🟡 High | 🟢 Standard
+affected-repos: [repo-a, repo-b]
+spec-status: draft | approved | superseded
+created: YYYY-MM-DD
+owner: <handle-or-email>
+---
+
 # Spec: <Feature Name>
 
 ## 业务目标 · Business Goal
-[PRD 核心目标 + 验收标准，1-3 条 · PRD core objectives + acceptance criteria, 1-3 items]
+[PRD 核心目标 + 验收标准 · PRD core objectives + acceptance criteria]
 
 ## 受影响的服务与仓库 · Affected Services & Repos
-| 服务 Service | 仓库 Repo | 影响类型 Impact Type（新增/修改/契约变更 add/modify/contract change）|
-|-------------|----------|------------------------------------------------------------------|
+| 服务 Service | 仓库 Repo | 影响类型 Impact Type |
+|-------------|----------|---------------------|
 
 ## 技术方案 · Technical Approach
-[核心技术路径。每个关键决策点写明：选了什么，为什么不选备选方案
-Core technical path. For each key decision: what was chosen and why alternatives were rejected]
+[核心技术路径 · Core technical path]
+
+## 边界 · Boundaries
+
+### Always do · 必做（不需要再问 · no further confirmation needed）
+- B-Always-1: ...
+- B-Always-2: ...
+
+### Ask first · 先问再做（人在回路 · human-in-the-loop）
+- B-AskFirst-1: ...
+
+### Never do · 严禁（红线 · red line）
+- B-Never-1: ...
+
+(每条带 ID，用于 Phase 4 task 反向引用 · Each entry has an ID for Phase 4 task back-references)
 
 ## API 契约变更 · API Contract Changes
-[如有新增/修改 RPC / HTTP 接口，贴请求响应 schema
-If new/modified RPC or HTTP interfaces, include request/response schema]
+[如有新增/修改接口 · If any new/modified interfaces]
 
 ## 数据模型变更 · Data Model Changes
-[DB schema diff / proto field 变更。shared-models rules：不得修改已有 field number
-DB schema diff / proto field changes. shared-models rules: never modify existing field numbers]
+[DB schema diff / proto field 变更 · DB schema diff / proto field changes]
 
 ## 不变式清单 · Invariants
-[业务层硬约束，例："同一 booking_id 最多产生一次资金变动"
-Hard business constraints, e.g. "a single booking_id can generate at most one financial transaction"]
+- I-1: ...
+- I-2: ...
+(每条带 ID，用于 task 反向引用 · Each entry has an ID for task back-references)
 
 ## 失败模式分析 · Failure Mode Analysis
-[至少列 4 种：正常路径崩溃 / 重试覆盖 / 并发竞态 / 下游超时
-At least 4: happy-path crash / retry idempotency / concurrent race / downstream timeout]
+[至少 4 种：正常路径崩溃 / 重试覆盖 / 并发竞态 / 下游超时
+ At least 4: happy-path crash / retry idempotency / concurrent race / downstream timeout]
 
 ## 部署策略 · Deployment Strategy
 [ ] 全量 Full rollout
@@ -320,18 +345,43 @@ At least 4: happy-path crash / retry idempotency / concurrent race / downstream 
 🔴 Critical / 🟡 High / 🟢 Standard（见 Phase 1.3 · see Phase 1.3）
 
 ## 回滚标准 · Rollback Criteria
-[什么指标异常时触发回滚，谁来决定
-Which metric anomaly triggers rollback, and who decides]
+[什么指标异常时触发回滚，谁来决定 · Which metric triggers rollback, who decides]
 
 ## 成功标准 · Success Criteria
 [具体可测量的完成条件 · Specific measurable completion conditions]
 
 ## 遗留问题 · Open Questions
-[尚未确认的事项，带负责人 · Unresolved items with assigned owners]
+
+| # | 问题 Question | 影响 Impact | Owner | Deadline | 状态 Status |
+|---|--------------|------------|-------|----------|------------|
+| Q1 | ... | ... | @user | YYYY-MM-DD | open |
 ```
 
-**门控 · Gate**：把 spec 展示给用户，等待明确的"确认"或修改意见，再进入 Phase 4。
-Show the spec to the user and wait for explicit confirmation or revision requests before entering Phase 4.
+#### 3.1 Phase 3 自检 checklist · Self-check before gate
+
+写完 spec 后、展示给用户前，自动跑：
+After writing the spec, before showing to user, run automatically:
+
+- [ ] Placeholder 扫描：无 "TBD" / "TODO" / "待确认" / "??"  · Placeholder scan
+- [ ] 内部一致性：技术方案 ↔ API 契约 ↔ 数据模型 三处无矛盾 · Internal consistency
+- [ ] 范围一致性：Boundaries 三段 ↔ JTBD + In/Not Doing/v2 无矛盾 · Scope consistency
+- [ ] 风险定级与 "风险层级" 节描述一致 · Risk level consistency
+- [ ] 每条 Boundary / Invariant 至少映射到 1 个技术决策 · Every Boundary/Invariant maps to ≥1 tech decision
+- [ ] Open Questions 无 owner 缺失项；无 deadline 缺失项 · Open Questions have owners + deadlines
+- [ ] frontmatter 完整：feature / prd-source / risk-level / affected-repos / owner · Frontmatter complete
+
+任何 ❌ 先自动尝试修复；不能修复的转为新 Open Question 提给用户。
+Any ❌ — auto-fix first; if unfixable, convert to a new Open Question for user.
+
+<HARD-GATE>
+不得进入 Phase 4，除非用户**显式**输入有效批准信号。
+有效信号：「approve Phase 3」/「确认 Phase 3」/「Phase 3 OK，继续」。
+无效信号（仅为会话寒暄，禁止当作批准）：「看起来不错」「continue」「嗯」「ok」「好的」「就这样」。
+
+Do NOT proceed to Phase 4 unless the user provides an **explicit** valid approval signal.
+Valid signals: "approve Phase 3" / "确认 Phase 3" / "Phase 3 OK, continue".
+Invalid signals: "looks good" / "continue" / "ok" / "好的" / "嗯".
+</HARD-GATE>
 
 ---
 
