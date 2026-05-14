@@ -138,6 +138,21 @@ ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
 
 > **Cross-platform tip:** `~/.agents/skills/` is the standard user-scoped directory in the Open Agent Skills ecosystem. Claude Code, Codex CLI, and OpenClaw all scan it automatically — install once, works across all three.
 
+**Step 3 (recommended): Install Superpowers**
+
+Both skills in this repo route to [Superpowers](https://superpowers.anthropic.com/) sub-skills for downstream phases:
+
+- `prd-to-tasks` — Phase 5 routes 🟡 High / 🟢 Standard tasks to `superpowers:brainstorming` / `writing-plans` / `subagent-driven-development`
+- `cross-verified-feature-development` — Phases ①②③ orchestrate the same Superpowers sub-skills
+
+Install once (Claude Code):
+
+```bash
+claude mcp add --transport http superpowers https://superpowers.anthropic.com/mcp
+```
+
+> **Skipping Superpowers is fine** — every phase has a native-tool fallback documented inside each SKILL.md. You only lose the polished prompts that Superpowers provides.
+
 <details>
 <summary><b>OpenCode adaptation</b> (click to expand)</summary>
 

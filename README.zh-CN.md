@@ -144,6 +144,21 @@ ln -sf "$SKILLS_REPO/skills/prd-to-tasks" \
 
 > **跨平台通用路径提示：** `~/.agents/skills/` 是 Open Agent Skills 生态的标准用户目录，Claude Code、Codex CLI、OpenClaw 均会自动扫描——安装到这里一次，三端同时生效。
 
+**第三步（推荐）：安装 Superpowers**
+
+本仓库两个 Skill 都会把下游阶段路由到 [Superpowers](https://superpowers.anthropic.com/) 子 skill：
+
+- `prd-to-tasks` — Phase 5 把 🟡 High / 🟢 Standard 任务路由到 `superpowers:brainstorming` / `writing-plans` / `subagent-driven-development`
+- `cross-verified-feature-development` — Phase ①②③ 编排同一套 Superpowers 子 skill
+
+一次性安装（Claude Code）：
+
+```bash
+claude mcp add --transport http superpowers https://superpowers.anthropic.com/mcp
+```
+
+> **不装 Superpowers 也能用** —— 每个阶段在 SKILL.md 里都有原生工具的 fallback 说明，只是少了 Superpowers 提供的成熟 prompt。
+
 <details>
 <summary><b>OpenCode 适配说明</b>（点击展开）</summary>
 
