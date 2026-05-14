@@ -156,7 +156,7 @@ Reference `references/repo-map.md` to map requirements to specific repos and ser
 |------------------------------------------|--------------------------------|
 | 用户下单、购物车、商品详情 · User checkout, cart, product detail | `bff-service` |
 | 订单状态、退款、钱包 · Order status, refunds, wallet | `order-service` (order-api-service / refund-service) |
-| 平台订单履约 · Platform order fulfillment | `platform-order-service` |
+| 履约、资源交付 · Fulfillment, resource delivery | `fulfillment-service`（参考 KB `repo-map.md` · see KB） |
 | 供应商履约、资源交付 · Supplier fulfillment, resource delivery | `fulfillment-service` |
 | 优惠券、库存 · Vouchers, inventory | `voucher-service` |
 | 支付、收款 · Payments, collections | `payment-service` |
@@ -193,7 +193,7 @@ The classification result determines the downstream workflow routing:
 |----------------------|--------------------|---------------------------------|
 | 🔴 **Critical** | 资金流 / 退款 / 余额 / 状态机 / 分布式锁 / 跨服务 MQ 协议 / online schema 迁移 · Money flow / refunds / balance / state machine / distributed locks / cross-service MQ protocol / online schema migration | → `cross-verified-feature-development` |
 | 🟡 **High** | 估算 ≥ 3 人日 / 多仓库联动 / 核心订单路径改造 · Estimated ≥ 3 person-days / multi-repo coordination / core order path changes | → `superpowers:brainstorming` → `writing-plans` → `subagent-driven-development` |
-| 🟢 **Standard** | 纯新增接口 / 无状态机语义 / 单仓库 / < 3 人日 · Pure new endpoints / no state machine semantics / single repo / < 3 person-days | → `superpowers:writing-plans` → implement |
+| 🟢 **Standard** | 纯新增接口 / 无状态机语义 / 单仓库 / < 3 人日 · Pure new endpoints / no state machine semantics / single repo / < 3 person-days | → `direct`（用户直接读 spec + 任务清单实施 · user reads spec + tasks and implements directly） |
 
 **Phase 1 输出格式 · Phase 1 Output Format:**
 
@@ -253,9 +253,10 @@ Based on the affected services identified in Phase 1, ask the user:
 我需要扫描以下仓库，请告诉我它们在你本地的路径：
 I need to scan the following repos. Please tell me their local paths:
 
-- order-service          → 路径 path？（例 e.g. ~/code/order-service）
-- platform-order-service → 路径 path？（例 e.g. ~/code/platform-order-service）
-- shared-models          → 路径 path？（如有 proto 变更 · if proto changes needed）
+- <service-a>          → 路径 path？（例 e.g. ~/code/<service-a>）
+- <service-b>          → 路径 path？（例 e.g. ~/code/<service-b>）
+- <shared-contracts>   → 路径 path？（如有 proto 变更 · if proto changes needed）
+（具体服务清单从你的 KB `repo-map.md` 中 Phase 1.1 已识别 · concrete service list comes from Phase 1.1's identification using your KB's `repo-map.md`）
 
 如果多个仓库在同一个父目录下（例如都在 ~/code/），
 If multiple repos share a parent directory (e.g. all under ~/code/),
@@ -353,7 +354,7 @@ feature: <kebab-case-name>
 prd-source: lark://docx/xxx 或 docs/prd/xxx.md 或 inline
 risk-level: 🔴 Critical | 🟡 High | 🟢 Standard
 affected-repos: [repo-a, repo-b]
-spec-status: draft | approved | superseded   # HARD-GATE 通过后 skill 自动更新为 approved · skill auto-updates to `approved` on HARD-GATE pass
+spec-status: draft | approved | superseded   # HARD-GATE 通过后请手动将状态改为 approved · manually update to `approved` after HARD-GATE pass
 created: YYYY-MM-DD
 owner: <handle-or-email>
 ---
@@ -439,7 +440,7 @@ After writing the spec, before showing to user, run automatically:
 - [ ] 风险定级与 "风险层级" 节描述一致 · Risk level consistency
 - [ ] 每条 Boundary / Invariant 至少映射到 1 个技术决策 · Every Boundary/Invariant maps to ≥1 tech decision
 - [ ] Open Questions 无 owner 缺失项；无 deadline 缺失项 · Open Questions have owners + deadlines
-- [ ] frontmatter 完整：feature / prd-source / risk-level / affected-repos / owner · Frontmatter complete
+- [ ] frontmatter 完整：feature / prd-source / risk-level / affected-repos / spec-status / created / owner · Frontmatter complete (all 7 fields)
 
 任何 ❌ 先自动尝试修复；不能修复的转为新 Open Question 提给用户。
 Any ❌ — auto-fix first; if unfixable, convert to a new Open Question for user.
@@ -520,6 +521,7 @@ Each task must include:
 **spec-refs**:
   - section: "技术方案 · Technical Approach"   # 引用 spec h2 节标题（原文复制 · copy heading text verbatim）
   - boundary: B-Always-1                       # 可多条 · multiple OK
+  - boundary: B-AskFirst-1                     # 触发人工确认的边界
   - boundary: B-Never-2
   - invariant: I-3                             # 可多条 · multiple OK
 

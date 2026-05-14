@@ -21,6 +21,8 @@ check() {
         echo "✅ $label  (matches=$actual)"
     elif [[ "$expect" == "eq0" && "$actual" -eq 0 ]]; then
         echo "✅ $label  (no matches, as expected)"
+    elif [[ "$expect" == "ge3" && "$actual" -ge 3 ]]; then
+        echo "✅ $label  (matches=$actual)"
     else
         echo "❌ $label  (expected $expect, got $actual)"
         FAIL=$((FAIL+1))
@@ -37,7 +39,7 @@ echo "=== Task 2: Phase 1 ==="
 check "SKILL.md: contains 'PM 范围澄清清单'" \
       "grep -c 'PM 范围澄清清单' $SKILL" gt0
 check "SKILL.md: contains 'HARD-GATE' (≥3 instances for Phase 1/3/4)" \
-      "grep -c '<HARD-GATE>' $SKILL" gt0
+      "grep -c '<HARD-GATE>' $SKILL" ge3
 check "SKILL.md: Phase 1 risk format has 考虑过的备选" \
       "grep -cE '考虑过的备选|考虑过' $SKILL" gt0
 
