@@ -2,6 +2,8 @@
 # Verifies prd-to-tasks skill redesign artifacts meet the contract in
 # docs/superpowers/specs/2026-05-14-prd-to-tasks-redesign-design.md
 set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$SCRIPT_DIR" || exit 1
 SKILL=skills/prd-to-tasks/SKILL.md
 REPO_MAP=skills/prd-to-tasks/references/repo-map.md
 PATTERNS=skills/prd-to-tasks/references/service-patterns.md
@@ -37,7 +39,7 @@ check "SKILL.md: contains 'PM 范围澄清清单'" \
 check "SKILL.md: contains 'HARD-GATE' (≥3 instances for Phase 1/3/4)" \
       "grep -c '<HARD-GATE>' $SKILL" gt0
 check "SKILL.md: Phase 1 risk format has 考虑过的备选" \
-      "grep -c '考虑过的备选\\|考虑过' $SKILL" gt0
+      "grep -cE '考虑过的备选|考虑过' $SKILL" gt0
 
 echo "=== Task 3: Phase 2 ==="
 check "SKILL.md: scan output has confidence column" \
