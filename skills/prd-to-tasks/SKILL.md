@@ -222,7 +222,8 @@ grep -r "type.*Service interface" <repo>/internal/ --include="*.go" -l
 grep -r "db\.WriteDB\|db\.ReadDB\|sqlx" <repo>/internal/ --include="*.go" -l
 
 # 4. 找 MQ topics（跨服务消息）· Find MQ topics (cross-service messages)
-grep -r "BrokerTopics\|KafkaTopics\|topic\." <repo>/internal/facade/mq/ --include="*.go"
+# Find MQ topic registries — adapt the pattern + path to your codebase
+grep -rE "topic[s]?\.|<your-broker-topic-slice>|<your-kafka-topic-slice>" <repo>/<your-mq-path>/ --include="*.<ext>"
 
 # 5. 找 proto 定义（跨服务接口契约）· Find proto definitions (cross-service contracts)
 find <repo> -name "*.proto" | head -20
@@ -235,10 +236,10 @@ Produce an **affected scope table** (with confidence column):
 
 | 文件 File | 影响类型 Impact | 改动点 Change | Confidence |
 |----------|----------------|--------------|------------|
-| `order-service/internal/service/booking/booking_service.go` | 修改 modify | `CreateBooking()`: 加入 feature flag 分支 · add feature flag branch | 高 high — directly named in PRD |
-| `order-service/internal/facade/mq/topic.go` | 修改 modify | MQ topic 注册表需同步新增 topic · MQ topic registries need new topic in sync | 中 medium — pattern-matched from KB |
-| `<shared-contracts-repo>/proto/order.proto` | 修改? modify? | 待确认是否需要新增字段 · pending confirmation on new field | 低 low — needs user input |
-| `platform-order-service/internal/service/order_v2/` | 新增消费者 new consumer | new file required | 高 high |
+| `<service-a>/internal/service/<domain>/<domain>_service.go` | 修改 modify | `CreateXxx()`: 加入 feature flag 分支 · add feature flag branch | 高 high — directly named in PRD |
+| `<service-a>/internal/<mq-path>/topic.go` | 修改 modify | MQ topic 注册表需同步新增 topic · MQ topic registries need new topic in sync | 中 medium — pattern-matched from KB |
+| `<shared-contracts-repo>/proto/<domain>.proto` | 修改? modify? | 待确认是否需要新增字段 · pending confirmation on new field | 低 low — needs user input |
+| `<service-b>/internal/service/<domain>_v2/` | 新增消费者 new consumer | new file required | 高 high |
 
 `confidence` 列三个值 · Three values:
 - **高 / high**：PRD 直接点名、或 KB 中有精确模式匹配 · PRD directly names it, or exact KB pattern match
@@ -397,37 +398,90 @@ Invalid signals: "looks good" / "continue" / "ok" / "好的" / "嗯" / "就这�
 Spec 确认后，拆解为**可独立执行、可独立验证**的工程任务。
 After spec is confirmed, break down into **independently executable, independently verifiable** engineering tasks.
 
+**默认保存到 · Default save path**：`docs/superpowers/plans/YYYY-MM-DD-<feature>-tasks.md`（以 CWD 为根 · rooted at CWD）。
+
+Plan 文件顶部必须带机读 frontmatter（Phase 5 路由 hand-off 契约的实际载体 · the actual carrier of the Phase 5 routing hand-off contract）。
+
+#### 4.0 Plan 文件 frontmatter · Plan File Frontmatter
+
+Plan 文件最开头必带 YAML frontmatter，下游 skill 凭此路由：
+
+```yaml
+---
+feature: <kebab-case-name>
+risk-level: 🔴 Critical | 🟡 High | 🟢 Standard
+routed-to: cross-verified-feature-development | superpowers:writing-plans | direct
+spec: ../specs/YYYY-MM-DD-<feature>-design.md
+routed-rationale: |
+  Selected <skill> because [...]
+  Considered <alternative> but rejected: [...]
+  Expected cost: [...]
+plan-status: ready-for-execution
+phase-gate-approvals:
+  phase-1: { approved-at: "YYYY-MM-DD HH:MM", phrase: "approve Phase 1" }
+  phase-3: { approved-at: "YYYY-MM-DD HH:MM", phrase: "确认 Phase 3" }
+  phase-4: { approved-at: "YYYY-MM-DD HH:MM", phrase: "Phase 4 OK" }
+created: YYYY-MM-DD
+created-by: <handle-or-email>
+---
+```
+
+紧随 frontmatter 之后是**任务 DAG**（mermaid）：
+Immediately after frontmatter comes the **task DAG** (mermaid):
+
+```mermaid
+graph TD
+  T1[Task 1: 修改 proto · modify proto] --> T2[Task 2: MQ topic 同步 · sync MQ topics]
+  T1 --> T3[Task 3: consumer A]
+  T2 --> T4[Task 4: consumer B]
+  T3 --> T5[Task 5: 集成测试 · integration tests]
+  T4 --> T5
+```
+
+DAG 让用户一眼看出关键路径和可并行批次，也是 `superpowers:subagent-driven-development` 的天然输入。
+The DAG shows critical path + parallelizable batches at a glance, and is the natural input for `superpowers:subagent-driven-development`.
+
 #### 4.1 任务格式 · Task Format
 
 每个任务必须包含：
 Each task must include:
 
 ```markdown
-### Task N: <动词 + 宾语，描述做什么 · verb + object, describe what to do>
+### Task N: <动词 + 宾语 · verb + object>
 
 **仓库 Repo**: <service-name>
-**文件 File**: `path/to/file.go`（如果是修改现有文件，带行号范围 · if modifying existing file, include line range）
+**文件 File**: `path/to/file.ext`（如修改现有文件带行号 · with line range if modifying existing file）
 **类型 Type**: 新增 add / 修改 modify / 删除 delete / 契约变更 contract change
+**尺寸 Size**: XS / S / M / L / XL
+**spec-refs**:
+  - section: <h2 名 · h2 section name>   # 引用 spec 章节
+  - boundary: B-Always-1                 # B-{Always|AskFirst|Never}-{序号}
+  - invariant: I-3                       # 来自 spec 不变式清单
 
 **具体改动 · Specific Changes**:
 [用代码片段说明，不用散文描述 · Use code snippets, not prose]
 
-**关联代码模式** (见 `references/service-patterns.md`) **· Associated Code Patterns** (see `references/service-patterns.md`):
-- [ ] 使用 `idgen.NextID()` 生成主键（不用自增 ID · not auto-increment ID）
-- [ ] 写后执行 `cache.DoubleDelete(ctx, key)`（如有 Redis mirror · if Redis mirror exists）
-- [ ] BrokerTopics + KafkaTopics 同步更新（如有新增 MQ topic · if new MQ topic added）
-- [ ] shared-models proto 只新增 field（不修改已有 field number · never modify existing field numbers）
+**关联代码模式 · Associated Code Patterns** (见 KB `~/.claude/prd-to-tasks/service-patterns.md`)：
+- [ ] [按 KB 引用具体 pattern · cite specific patterns from KB]
 
 **验证命令 · Verification Commands**:
 \`\`\`bash
-make build   # 编译不出错 · compiles without error
-make test    # 相关 test 通过 · relevant tests pass
-make lint    # lint 无新增 error · no new lint errors
+<project-specific build/test/lint commands>
 \`\`\`
 
-**依赖 Dependencies**: Task X, Task Y（前置任务 · prerequisite tasks）
-**风险标注 Risk Notes**: ⚠️ 并发写 concurrent write / ⚠️ 跨仓库契约变更 cross-repo contract change / ...（如有 if any）
+**依赖 Dependencies**: Task X, Task Y
+**风险标注 Risk Notes**: ⚠️ ... （如有 · if any）
 ```
+
+#### 4.1.1 尺寸刻度 · Size Scale
+
+| 标签 Label | 工时 Time | 何时用 When to use |
+|-----------|----------|--------------------|
+| **XS** | < 30 min | 单文件 < 20 行改动，无新逻辑 · Single file, < 20 lines, no new logic |
+| **S** | 30 min – 2h | 单文件 < 100 行 · Single file, < 100 lines |
+| **M** | 2 – 4h | 单 Service + 测试 · Single service + tests |
+| **L** | 4 – 8h | 多文件协同 · Multi-file coordination |
+| **XL** | > 8h | **应进一步拆分** · **Should be split further**；如保留必须写出"拆分被否决的理由" · If kept, must include "split rejection reason" |
 
 #### 4.2 任务排序原则 · Task Ordering Principles
 
@@ -440,13 +494,32 @@ make lint    # lint 无新增 error · no new lint errors
 4. **测试与实现并行 · Tests alongside implementation**：每个 task 在同一 batch 里包含对应的测试 task
    Each task includes corresponding test tasks in the same batch
 
-#### 4.3 工作量估算 · Effort Estimation
+#### 4.3 Phase 4 完整性自检 · Completeness self-check before gate
 
-每个 task 给出：S（< 2h）/ M（2-4h）/ L（> 4h）。L 级 task 应考虑进一步拆分。
-Each task gets: S (< 2h) / M (2–4h) / L (> 4h). L-sized tasks should be considered for further breakdown.
+展示任务清单给用户前，自动跑：
+Before showing the task list to user, run automatically:
 
-**门控 · Gate**：展示完整任务列表（含风险标注），等待用户确认再进入 Phase 5。
-Show the complete task list (including risk annotations) and wait for user confirmation before entering Phase 5.
+- [ ] Spec 中每条 Boundary / Invariant 都有 ≥1 task 通过 `spec-refs` 引用 · Every spec Boundary/Invariant referenced by ≥1 task
+- [ ] 每条 Failure Mode 都有对应的测试 task · Each Failure Mode has a corresponding test task
+- [ ] proto / shared contracts 修改 task 排在所有消费者 task 之前 · Contract-first task ordering
+- [ ] online DDL / schema 迁移 task 排在所有逻辑 task 之前 · DB-schema-first ordering
+- [ ] 无 XL 未拆分（或显式写出否决理由） · No unsplit XL (or explicit rejection reason)
+- [ ] 每个 task 有可执行的 build / test 验证命令 · Every task has executable build/test verify commands
+- [ ] Plan frontmatter `routed-to` / `spec` / `phase-gate-approvals` 字段完整 · Plan frontmatter complete
+- [ ] 任务清单中**不含**公司内部 helper / 内部 topic / 内部布局命名（开源安全检查） · No company-internal identifiers leaked (open-source safety check)
+
+任何 ❌ 必须修复或显式 acknowledge 才能进入 Phase 5。
+Any ❌ — fix or explicitly acknowledge before entering Phase 5.
+
+<HARD-GATE>
+不得进入 Phase 5，除非用户**显式**输入有效批准信号。
+有效信号：「approve Phase 4」/「确认 Phase 4」/「Phase 4 OK，继续」。
+无效信号（仅为会话寒暄，禁止当作批准）：「看起来不错」「continue」「嗯」「ok」「好的」「就这样」。
+
+Do NOT proceed to Phase 5 unless the user provides an **explicit** valid approval signal.
+Valid signals: "approve Phase 4" / "确认 Phase 4" / "Phase 4 OK, continue".
+Invalid signals: "looks good" / "continue" / "ok" / "好的" / "嗯" / "就这样".
+</HARD-GATE>
 
 ---
 
