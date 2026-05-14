@@ -99,28 +99,27 @@ Reference `references/repo-map.md` to map requirements to specific repos and ser
 | 支付、收款 · Payments, collections | `payment-service` |
 | 跨服务共享模型 / proto · Cross-service shared models / proto | `shared-models` |
 
-#### 1.2 向用户澄清的问题模板 · Clarification Question Template
+#### 1.2 PM 范围澄清清单 · PM Scope-Clarity Checklist
 
-在问任何技术问题之前，先把你能从 PRD 和代码库中自行推断的信息全列出来（"我假设..." 格式），然后只问**无法自行判断**的事项：
-Before asking any technical questions, list everything you can infer from the PRD and codebase ("I assume..." format), then only ask about what you **cannot determine yourself**:
+在问任何技术问题之前，先把你能从 PRD 和代码库中自行推断的信息全列出来（"我假设..." 格式），然后只问**无法自行判断**的事项。
 
-```
-我的初步判断（请确认或纠正）· My initial assessment (please confirm or correct):
-1. 主要影响 order-service 的 order-api-service 和 platform-order-service
-   Primarily affects order-service (order-api-service) and platform-order-service
-2. 需要修改订单状态机（CreateOrder → ConfirmedOrder 路径）
-   Need to modify the order state machine (CreateOrder → ConfirmedOrder path)
-3. 有跨服务 MQ 协议变更（platform 侧需要新增消息类型）
-   Cross-service MQ protocol change required (platform side needs new message type)
+Before asking any technical questions, list everything you can infer from the PRD and codebase ("I assume..." format), then only ask about what you **cannot determine yourself**.
 
-还需要你帮我确认 · Still need your confirmation:
-Q1. 这个功能是否要分灰度上线，还是全量？（影响是否要加 feature flag）
-    Should this feature roll out gradually (canary) or all at once? (affects whether we need a feature flag)
-Q2. DB schema 是否有变更，还是纯逻辑改动？
-    Is there a DB schema change, or is this purely logic?
-Q3. 上线时间节点（影响拆解粒度和 task 优先级）
-    Launch timeline (affects breakdown granularity and task priority)
-```
+逐项填写或注明 "PRD 已覆盖"。任何空项必须形成 Open Question 提给用户。
+Fill in each item or mark "covered by PRD". Any blank must become an Open Question to the user.
+
+| # | 维度 · Dimension | 输出要求 · Output Requirement |
+|---|------------------|------------------------------|
+| 1 | **JTBD** (Job-to-be-done) | 谁在什么场景下用，要解决什么痛点（不是"实现 X 功能"，而是"让 Y 用户在 Z 情境下能做到 W"） · Who uses it in what context, what pain it solves (not "implement X", but "enable Y user in Z context to do W") |
+| 2 | **In scope** | 本期必做的可枚举能力清单 · Enumerable capabilities required this iteration |
+| 3 | **Not Doing** | 显式排除的能力（防止范围蔓延） · Explicitly excluded capabilities (scope-creep guard) |
+| 4 | **Deferred to v2** | 推迟到下一版的能力 + 推迟理由 · Capabilities deferred + reason |
+| 5 | **成功指标 · Success Metrics** | 业务指标（如转化率 +X%）+ 技术指标（如 p99 < Yms），均需可量化 · Business metric (e.g. conversion +X%) + technical metric (e.g. p99 < Yms), both quantifiable |
+| 6 | **使用者主路径 · User Happy Path** | happy path 的用户操作序列 · User operation sequence on happy path |
+| 7 | **极端失败模式 · Worst-case Failure** | 最坏情况：什么会坏 + 谁/什么会受伤 + 影响半径 · Worst case: what breaks, who/what is harmed, blast radius |
+| 8 | **回滚指标 · Rollback Trigger** | 哪个 metric 超阈值触发回滚 + 谁决定 + 耗时 · Which metric anomaly triggers rollback, who decides, time-to-rollback |
+| 9 | **上下游依赖 · Upstream/Downstream** | 其他团队/服务的同步要求 · Synchronization requirements with other teams/services |
+| 10 | **合规/审计 · Compliance/Audit** | PII / GDPR / 资金审计 / 操作日志要求 · PII, GDPR, financial audit, operation log requirements |
 
 #### 1.3 风险定级 · Risk Classification
 
@@ -133,7 +132,47 @@ The classification result determines the downstream workflow routing:
 | 🟡 **High** | 估算 ≥ 3 人日 / 多仓库联动 / 核心订单路径改造 · Estimated ≥ 3 person-days / multi-repo coordination / core order path changes | → `superpowers:brainstorming` → `writing-plans` → `subagent-driven-development` |
 | 🟢 **Standard** | 纯新增接口 / 无状态机语义 / 单仓库 / < 3 人日 · Pure new endpoints / no state machine semantics / single repo / < 3 person-days | → `superpowers:writing-plans` → implement |
 
+**Phase 1 输出格式 · Phase 1 Output Format:**
+
+```
+我的初步判断（基于 PRD + 代码库扫描）· My initial assessment (based on PRD + codebase scan):
+[每条用 "我假设 ..." 开头 · Each starts with "I assume ..."]
+
+仍需你确认的 Open Questions · Still need your confirmation:
+[只列 PM 清单中我无法自答的项 · Only list items I cannot self-answer from the PM checklist]
+
+风险定级初判 · Initial risk classification: 🔴 Critical
+[理由 · Reason: 触发 Phase 1.3 矩阵第 1 行（资金流 / 退款 / 余额）]
+[考虑过的备选 · Alternatives considered: 🟡 High, but rejected because lacks cross-service contract change]
+```
+
+记录"考虑过的备选定级 + 排除理由"是事后回看"为什么走了 cross-verified-feature-development"时的审计线索。
+Recording "considered alternative classification + rejection reason" provides an audit trail for retrospective review.
+
 **呈现定级结果，等用户确认再继续。· Present the classification result and wait for user confirmation before proceeding.**
+
+#### 1.4 Phase 1 自检 checklist · Self-check before gate
+
+提交给用户前自动跑：
+Run automatically before presenting to user:
+
+- [ ] 用了 Phase 1.3 矩阵的具体行号作为定级理由 · Used a specific Phase 1.3 matrix row as the rationale
+- [ ] 至少考虑了 1 个备选定级并写出排除理由 · Considered at least 1 alternative classification with rejection reason
+- [ ] 🔴 触发关键词（资金 / 状态机 / MQ / schema / 锁 / 跨服务契约）显式列出 · 🔴 trigger keywords explicitly listed
+- [ ] PM 检查清单 10 项无未答项（已答 or 已转 Open Question） · All 10 PM checklist items answered or converted to Open Question
+
+任何 ❌ 必须自动尝试修复或显式 acknowledge 才能进入下一阶段。
+Any ❌ must be auto-fixed or explicitly acknowledged before proceeding.
+
+<HARD-GATE>
+不得进入 Phase 2，除非用户**显式**输入有效批准信号。
+有效信号：「approve Phase 1」/「确认 Phase 1」/「Phase 1 OK，继续」。
+无效信号（仅为会话寒暄，禁止当作批准）：「看起来不错」「continue」「嗯」「ok」「好的」「就这样」。
+
+Do NOT proceed to Phase 2 unless the user provides an **explicit** valid approval signal.
+Valid signals: "approve Phase 1" / "确认 Phase 1" / "Phase 1 OK, continue".
+Invalid signals (conversational acknowledgements, NOT approval): "looks good" / "continue" / "ok" / "好的" / "嗯".
+</HARD-GATE>
 
 ---
 
