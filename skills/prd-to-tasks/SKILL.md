@@ -156,7 +156,7 @@ Recording "considered alternative classification + rejection reason" provides an
 提交给用户前自动跑：
 Run automatically before presenting to user:
 
-- [ ] 用了 Phase 1.3 矩阵的具体行号作为定级理由 · Used a specific Phase 1.3 matrix row as the rationale
+- [ ] 用了 Phase 1.3 矩阵的具体风险层级（🔴/🟡/🟢）和判定标准作为定级理由 · Cited a specific Phase 1.3 risk level (🔴/🟡/🟢) and its criteria as the rationale
 - [ ] 至少考虑了 1 个备选定级并写出排除理由 · Considered at least 1 alternative classification with rejection reason
 - [ ] 🔴 触发关键词（资金 / 状态机 / MQ / schema / 锁 / 跨服务契约）显式列出 · 🔴 trigger keywords explicitly listed
 - [ ] PM 检查清单 10 项无未答项（已答 or 已转 Open Question） · All 10 PM checklist items answered or converted to Open Question
