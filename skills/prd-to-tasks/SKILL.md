@@ -207,9 +207,9 @@ Start scanning only after the user confirms paths. If the user says "I'm not sur
 
 **工具优先级 · Tool Priority**：
 
-如目标语言的 LSP 服务可用（如 Go 的 `gopls`、Python 的 `pyright`、TypeScript 的 `typescript-language-server`），**优先**用 LSP 的 references / implementations / call hierarchy 调用替代 grep — LSP 能解析 symbol 语义，grep 容易漏识别接口实现关系。LSP 不可用时降级为下面的 grep + find 组合。
+如目标语言的 LSP 服务可用（如 Go 的 `gopls`、Python 的 `pyright`、TypeScript 的 `typescript-language-server`），**优先**用 LSP 的 references / implementations / call hierarchy 调用替代 grep — LSP 能解析 symbol 语义，grep 容易漏识别接口实现关系。LSP 不可用时降级为下面的 grep + find 组合。如当前 harness 提供 `LSP` 工具（如 Claude Code），调用其 `references` / `implementations` / `call_hierarchy` action；不可用时降级到下面的 grep + find。
 
-If target-language LSP is available (e.g. `gopls` for Go, `pyright` for Python, `typescript-language-server` for TypeScript), **prefer** LSP `references` / `implementations` / `call hierarchy` calls over grep — LSP resolves symbol semantics, while grep often misses interface-implementation relations. Fall back to the grep + find combo below if LSP is unavailable.
+If target-language LSP is available (e.g. `gopls` for Go, `pyright` for Python, `typescript-language-server` for TypeScript), **prefer** LSP `references` / `implementations` / `call hierarchy` calls over grep — LSP resolves symbol semantics, while grep often misses interface-implementation relations. Fall back to the grep + find combo below if LSP is unavailable. If the current harness exposes an `LSP` tool (e.g. Claude Code), call its `references` / `implementations` / `call_hierarchy` actions; fall back to the grep + find block below if unavailable.
 
 ```bash
 # 1. 找入口 handler（接口定义）· Find entry handlers (interface definitions)
