@@ -59,6 +59,67 @@ Each gated phase must wait for explicit human confirmation before proceeding.
 
 ---
 
+## 知识库 · Knowledge Base
+
+`repo-map`、`service-patterns` 等映射文件**不是硬编码在本 skill 里的**——它们是用户/团队可演进的知识库。原因：每家公司、每个团队的代码仓库布局和内部代码模式都不同。
+
+`repo-map`, `service-patterns`, etc. are **not hardcoded in this skill** — they are user/team-evolvable knowledge bases. Reason: every company's code layout and internal patterns are different.
+
+### 加载顺序 · Loading Order
+
+首找优先；同 key 项目级覆盖用户级。First-found wins; project-level overrides user-level.
+
+```
+1. <CWD>/.claude/prd-to-tasks/*.md       # 项目级 · Project-level (team-shared via git)
+2. ~/.claude/prd-to-tasks/*.md           # 用户级 · User-level (cross-project personal KB)
+3. <skill>/references/*.md              # skill 仓库自带 seed · Bundled seed (read-only, industry-neutral)
+```
+
+### KB 目录文件清单（按需扩展）· KB File List (extensible)
+
+skill 在加载时枚举 KB 目录下所有 `*.md` 文件。常见但不限于：
+The skill enumerates all `*.md` files in the KB directory at load time. Common but not limited to:
+
+| 文件 File | 内容 Content | 何时读 When read |
+|----------|-------------|------------------|
+| `repo-map.md` | 需求信号 → 受影响服务/仓库 · Requirement signal → affected services/repos | Phase 1.1 |
+| `service-patterns.md` | 内部代码模式（ID 生成、缓存失效、MQ topic 注册 等）· Internal patterns | Phase 4 task checklist |
+| `<custom>.md` | 用户自定义（例 `state-machine-conventions.md`、`team-owners.md`）· User-custom | 全局，skill 自行判断何时引用 |
+
+### Bootstrap 协议 · Bootstrap Protocol
+
+Phase 0 摄取完 PRD 后，本 skill 检测 KB 目录：
+After Phase 0 PRD ingestion, this skill detects the KB directory:
+
+- 若 `<CWD>/.claude/prd-to-tasks/` 或 `~/.claude/prd-to-tasks/` 存在 → 直接使用
+  If `<CWD>/.claude/prd-to-tasks/` or `~/.claude/prd-to-tasks/` exists → use directly
+- 若都不存在 → 提示用户：
+
+```
+KB 目录未找到。建议运行：
+  mkdir -p ~/.claude/prd-to-tasks
+  cp <skill>/references/*.md ~/.claude/prd-to-tasks/
+然后按你的代码库改写。
+或选择跳过（继续但 Phase 1.1 / Phase 4 检查项能力会受限）。
+
+KB directory not found. Recommended:
+  mkdir -p ~/.claude/prd-to-tasks
+  cp <skill>/references/*.md ~/.claude/prd-to-tasks/
+Then customize for your codebase.
+Or skip (continue but Phase 1.1 / Phase 4 will have reduced capability).
+```
+
+加载完成后**打印实际生效的 KB 路径列表**给用户，便于发现 path 错位。
+After loading, **print the effective KB path list** to the user for path-error detection.
+
+### 演进协议（重述 Phase 2.3）· Evolution Protocol (recap of Phase 2.3)
+
+- 用户必须**显式同意**才会写入 KB · Explicit user approval required for KB writes
+- 本 skill **永不静默写入 KB** · This skill **never silently writes to KB**
+- 写入前显示完整 diff · Show full diff before write
+
+---
+
 ### Phase 0: PRD 摄取 · PRD Ingestion
 
 接收 PRD 的三种形式：
@@ -527,34 +588,58 @@ Invalid signals: "looks good" / "continue" / "ok" / "好的" / "嗯" / "就这�
 
 ### Phase 5: 工作流路由 · Workflow Routing
 
-任务清单确认后，根据 Phase 1.3 的风险定级决定后续工作流：
-After the task list is confirmed, decide the downstream workflow based on the Phase 1.3 risk classification:
+任务清单确认后，根据 Phase 1.3 的风险定级**写入 plan 文件的 frontmatter `routed-to:` 字段**——路由不再是口头交付，而是机读契约。
+
+After the task list is approved, based on Phase 1.3 risk classification, **write the decision into the plan file's frontmatter `routed-to:` field** — routing is no longer a verbal hand-off but a machine-readable contract.
+
+#### 5.1 路由决策树 · Routing Decision Tree
 
 ```
-风险层级 = 🔴 Critical?
-Risk level = 🔴 Critical?
+风险层级 · Risk level = ?
 │
-├── YES → 建议走 cross-verified-feature-development
-│         Recommend cross-verified-feature-development
-│         (额外 4 轮交叉验证：自查 / 冷评审 / 行为差异 diff / 跨仓库影响扫描
-│          4 additional cross-verification rounds: self-review / cold review /
-│          behavior diff / cross-repo impact scan)
-│         预期额外成本：+40-50% 时间 · Expected additional cost: +40–50% time
-│         说明：将把 Phase 3 的 spec 文档和 Phase 4 的任务清单作为输入
-│         Note: Phase 3 spec doc and Phase 4 task list serve as inputs
+├── 🔴 Critical → routed-to: cross-verified-feature-development
+│                  额外 4 轮交叉验证 · 4 cross-verification passes
+│                  预期额外成本 · expected cost premium: +40–50% time
 │
-├── 🟡 High → superpowers:brainstorming → superpowers:writing-plans
+├── 🟡 High → routed-to: superpowers:writing-plans
 │              → superpowers:subagent-driven-development
-│              说明：brainstorming 阶段可以把本 skill 产出的 spec 作为起点
-│              Note: brainstorming phase can use this skill's spec output as a starting point
+│              Spec + task 清单作为输入 · spec + task list as inputs
 │
-└── 🟢 Standard → superpowers:writing-plans → 直接实施 implement directly
-                  说明：本 skill 产出的任务清单直接作为 writing-plans 的输入
-                  Note: this skill's task list feeds directly into writing-plans
+└── 🟢 Standard → routed-to: direct
+                   用户直接读 spec + 任务清单实施 · user reads spec + tasks and implements directly
 ```
 
-**向用户说明工作流选择的理由和代价，让用户决定**。不要强制拉人走高代价流程，但不要默默降级而不告知。
-**Explain the rationale and cost of the workflow choice to the user and let them decide.** Don't force anyone into a high-cost workflow, but don't silently downgrade without disclosure.
+#### 5.2 下游消费契约 · Downstream Consumption Contract
+
+| 下游 skill · Downstream | 如何读 plan header · How it reads the plan header |
+|------------------------|-------------------------------------------------|
+| `cross-verified-feature-development` | 校验 `routed-to == self`，读 `spec:` 文件作为 Phase 1 输入，任务清单作为 Phase 2 输入 · Verify `routed-to == self`, read `spec:` file as Phase 1 input, task list as Phase 2 input |
+| `superpowers:writing-plans` | 读 `spec:` 文件作为输入，把任务清单转为 superpowers plan 步骤格式 · Read `spec:` as input, convert task list to superpowers plan steps |
+| `direct` | 用户人肉读 spec + 任务清单直接实施 · User reads spec + tasks and implements directly |
+
+#### 5.3 Phase 5 输出 · Phase 5 Output
+
+本 skill **不自动 invoke 下游**——只输出建议命令。例如：
+
+This skill **does NOT auto-invoke downstream** — it only outputs suggested commands. For example:
+
+```
+✅ 路由完成 · Routing complete.
+
+Spec:  docs/superpowers/specs/YYYY-MM-DD-<feature>-design.md
+Plan:  docs/superpowers/plans/YYYY-MM-DD-<feature>-tasks.md
+Routed-to: cross-verified-feature-development
+
+建议下一步（请在新会话中运行）· Suggested next step (run in a new session):
+  /cross-verified-workflow
+
+或如果选择 superpowers 路径 · Or if going the superpowers route:
+  /superpowers:writing-plans  (skill 会读 spec 并产出实施计划)
+  /superpowers:subagent-driven-development  (执行)
+```
+
+**理由 · Reason**：跨阶段切换是天然 review point；自动 invoke 会让用户失去最后一次反悔窗口。
+Cross-phase transition is a natural review point; auto-invoking removes the user's last veto window.
 
 ---
 
