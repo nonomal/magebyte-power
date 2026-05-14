@@ -28,9 +28,12 @@ claude mcp add --transport http superpowers https://superpowers.anthropic.com/mc
 |-------|-------|------|
 | 1 | `superpowers:brainstorming` | 需求分析 → 结构化 spec |
 | 2 | `superpowers:writing-plans` | spec → 可执行 task 清单 |
-| 3 | `superpowers:subagent-driven-development` | 每个 task 独立 subagent 实施 |
+| 3 | `superpowers:test-driven-development` + `superpowers:executing-plans` | 测试先行 + 按计划执行每个 task |
 | 4.1 | `superpowers:systematic-debugging` | 自查阶段的结构化调试框架 |
-| 5 | `superpowers:writing-plans` + `superpowers:subagent-driven-development` | 修复迭代 |
+| 5 | `superpowers:writing-plans` + `superpowers:executing-plans` | 修复迭代 |
+| 6 | `superpowers:verification-before-completion` | 验收：用证据证明每项完成标准 |
+| 7 | `superpowers:requesting-code-review` → `superpowers:receiving-code-review` | 提交审查 → 接收并处理 review 意见 |
+| 9 | `superpowers:finishing-a-development-branch` | 分支收尾：merge / PR / cleanup |
 
 **没有 Superpowers 也能用（fallback）：**
 
@@ -38,9 +41,12 @@ claude mcp add --transport http superpowers https://superpowers.anthropic.com/mc
 |-------|-------------|
 | Phase 1 | 手动撰写 spec 文档，确保包含：问题陈述、技术方案、不变式清单、失败模式分析、风险表格 |
 | Phase 2 | 手动拆 task 清单，每个 task 须有文件 + 行号 + 验证命令 |
-| Phase 3 | 逐 task 实施，每个 task 完成后做 self-review 再进下一个 |
+| Phase 3 | 先写失败测试，再逐 task 实施，每个 task 完成后做 self-review 再进下一个 |
 | Phase 4.1 | 按 `references/cross-verification-techniques.md` 中的 4.1 checklist 手动自查 |
 | Phase 4.2–4.5 | 直接使用 `references/cross-verification-techniques.md` 里的 agent prompt 模板 dispatch subagent |
+| Phase 6 | 对照 spec 的 Success Criteria 逐项跑验证命令，无通过凭证不算完成 |
+| Phase 7 | 手动走 PR + code review 流程，重大问题返回 Phase 4/5 修复 |
+| Phase 9 | 手动清理分支、更新 CHANGELOG、通知下游 |
 
 ## Overview · 概览
 
@@ -117,17 +123,21 @@ None of the above?  ──→  Standard workflow is fine ✓
 
 ---
 
-## 7-Phase Workflow · 完整 7 阶段工作流
+## 9-Phase Workflow · 完整 9 阶段工作流
 
 ```
 ① 需求/设计        → superpowers:brainstorming
 ①.5 架构决策评审   → ADR（高风险特性必做）
 ② 实施计划        → superpowers:writing-plans（含部署策略）
-③ 实施           → superpowers:subagent-driven-development
+③ 实施           → superpowers:test-driven-development + superpowers:executing-plans
 ④ 🔥 多轮交叉验证  ← 本 skill 的核心创新
-⑤ 迭代修复        → writing-plans round 2 + executing（含回归保护）
-⑥ 谨慎简化        → 带怀疑的优化
-⑦ 文档同步        → 回填 evolution log + 下游通知
+⑤ 迭代修复        → writing-plans round 2 + executing-plans（含回归保护）
+⑥ ✅ 验收          → superpowers:verification-before-completion
+                      ↩ 验收不通过 → 回 Phase ② 重新规划
+⑦ 👁 代码评审       → superpowers:requesting-code-review → receiving-code-review
+                      ↩ 重大问题 → 回 Phase ④/⑤ 调试修复
+⑧ 谨慎简化        → 带怀疑的优化
+⑨ 文档同步/收尾   → 回填 evolution log + superpowers:finishing-a-development-branch
 ```
 
 ### Phase 1: Requirements & Design · 需求/设计
@@ -207,22 +217,27 @@ None of the above?  ──→  Standard workflow is fine ✓
 
 ### Phase 3: Implementation · 实施
 
-**目标**：按 plan 逐 task 落地，每个 task 有独立 review。
+**目标**：测试先行，按 plan 逐 task 落地，每个 task 有独立 review。
 
-**怎么做**：调用 `superpowers:subagent-driven-development`。每个 task：
-1. Dispatch implementer subagent（fresh context）
-2. Implementer 自 review + commit
-3. Dispatch spec compliance reviewer（验证是否建了要求的东西）
-4. Dispatch code quality reviewer（验证代码质量）
-5. 任何 reviewer 找到问题 → implementer 修 → re-review
-6. 全通过 → 下一 task
+**怎么做**：
+1. 先调用 `superpowers:test-driven-development`：对每个 task，**先写失败测试**，确认测试失败后再写实现。
+2. 再调用 `superpowers:executing-plans`：按 Phase 2 产出的 plan 驱动实施。每个 task：
+   - Dispatch implementer subagent（fresh context）
+   - Implementer 自 review + commit
+   - Dispatch spec compliance reviewer（验证是否建了要求的东西）
+   - Dispatch code quality reviewer（验证代码质量）
+   - 任何 reviewer 找到问题 → implementer 修 → re-review
+   - 全通过 → 下一 task
 
-**关键心态**：**每个 task 独立的 fresh subagent** 比一个大 context 连续写完**更不容易犯错**，因为没有累积偏见。
+**关键心态**：**每个 task 独立的 fresh subagent** 比一个大 context 连续写完**更不容易犯错**，因为没有累积偏见。先写失败测试能在实施前暴露设计歧义。
 
-**反模式**：图省事把多个 task 合并给一个 subagent 写完 → 冗长 context → 关键约束被忘记。
+**反模式**：
+- 图省事跳过写测试直接实现 → Phase 4 验证时发现测试覆盖不足，代价更高
+- 把多个 task 合并给一个 subagent 写完 → 冗长 context → 关键约束被忘记
 
 **✅ Exit Criteria — Phase 3 完成标准：**
 - [ ] Plan 中所有 task 标记完成，有对应 commit SHA
+- [ ] 每个 task 有先于实现写入的失败测试（测试先红后绿）
 - [ ] 构建通过：`make build`（或项目等效命令）
 - [ ] 测试通过：`make test`（或项目等效命令）
 - [ ] 每个 task 经过 spec compliance review + code quality review
@@ -303,7 +318,7 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 
 **目标**：把 Phase 4 发现的问题修到干净。
 
-**怎么做**：把所有发现的 issue 汇总成一个新的 plan（`docs/superpowers/plans/YYYY-MM-DD-<feature>-review-fixes.md`），再走一遍 `writing-plans` + `subagent-driven-development`。
+**怎么做**：把所有发现的 issue 汇总成一个新的 plan（`docs/superpowers/plans/YYYY-MM-DD-<feature>-review-fixes.md`），再走一遍 `writing-plans` + `executing-plans`（含 TDD：每个修复先写回归测试）。
 
 **关键原则**：
 - **按严重程度分批**：Critical → High → Medium → Low
@@ -323,7 +338,50 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 
 ---
 
-### Phase 6: Careful Simplification · 谨慎简化
+### Phase 6: Verification-Before-Completion · 验收
+
+**目标**：用**可重现的执行证据**证明每项完成标准已达到——"我觉得行了"不算完成。
+
+**怎么做**：调用 `superpowers:verification-before-completion`。框架要求：
+- 对照 spec 的 Success Criteria 和 Phase 2 plan 的 Exit Criteria，逐条收集**实际命令输出截图/日志**作为证据
+- 每条标准必须有对应命令的实际运行结果，而不是断言"已完成"
+- 发现任何一条 Critical 标准未能通过 → **不得进入 Phase 7**
+
+**⚠️ 反馈回路 · Feedback Loop:**
+
+> 如果验收发现标准根本无法在当前设计下达到（不是 bug，而是设计本身有偏差），**回到 Phase 2**（writing-plans）重新规划，不要继续打补丁。验收阶段暴露的设计问题比 review 阶段代价更低，比生产更低。
+
+**✅ Exit Criteria — Phase 6 完成标准：**
+- [ ] Spec 的所有 Success Criteria 逐条有运行证据（命令 + 输出，不是口头断言）
+- [ ] `make build` + `make test` 全量通过，日志已保存
+- [ ] 没有遗留 Critical/High unresolved issue
+- [ ] 若发现设计级偏差：已回到 Phase 2 重新规划，当前 Phase 6 暂停
+
+---
+
+### Phase 7: Code Review · 代码评审
+
+**目标**：通过**独立 reviewer 的外部视角**捕捉实施者盲点，重大问题在 merge 前修复。
+
+**怎么做**：
+1. 调用 `superpowers:requesting-code-review`：准备 review 请求（diff 范围、背景摘要、已知风险、需要关注点）并提交
+2. 调用 `superpowers:receiving-code-review`：结构化处理 reviewer 反馈——逐条分类（accept / request-clarification / push-back with reason），不要默认全部接受
+
+**反馈回路 · Feedback Loop:**
+
+> 如果 review 发现**重大问题**（逻辑错误 / 并发 race / 幂等漏洞 / 设计级 mismatch），**回到 Phase 4/5**（systematic-debugging + 迭代修复），不要在 review 意见里原地 patch。回来后需重新走 Phase 6 验收。
+>
+> "重大"判定启发式：这个问题如果在生产才发现，会触发 incident 吗？如果是，就算重大。
+
+**✅ Exit Criteria — Phase 7 完成标准：**
+- [ ] 所有 Critical/High review 意见已处理（修复 or 有文档化的接受理由）
+- [ ] 重大问题已回 Phase 4/5 修复，并重新通过 Phase 6 验收
+- [ ] Medium/Low 意见已处置（accept / defer with reason）
+- [ ] Reviewer 确认没有新的阻塞性问题
+
+---
+
+### Phase 8: Careful Simplification · 谨慎简化
 
 **触发点**：Phase 5 结束后，有时会发现代码"似乎有冗余"、"看起来可以简化"。
 
@@ -345,16 +403,16 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 
 **遇到翻车**：果断 `git revert`，把教训写进 evolution log，不要试图"再简化一次"。
 
-**✅ Exit Criteria — Phase 6（如做了简化）：**
+**✅ Exit Criteria — Phase 8（如做了简化）：**
 - [ ] `anti-patterns.md` Simplification Checklist 所有项已勾选（有代码证据，不是"感觉可以"）
 - [ ] 简化后运行了新一轮 cold-context review，无新 High 级别问题
 - [ ] 简化失败并回滚时：教训已写入 evolution log
 
 ---
 
-### Phase 7: Doc Sync · 文档同步
+### Phase 9: Doc Sync & Branch Finish · 文档同步/收尾
 
-**目标**：把**最终代码状态回填到原设计文档**。
+**目标**：把**最终代码状态回填到原设计文档**，然后干净地完成分支。
 
 **为什么重要**：
 - Phase 5 的修复会让**代码偏离原设计**，如果不同步，文档会误导下一个维护者
@@ -373,12 +431,15 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 - 默认"代码就是文档"——半年后没人能从代码反推决策
 - 删掉原设计内容"因为跟实际不一致"——那是历史，是教训
 
-**✅ Exit Criteria — Phase 7 完成标准：**
+**收尾**：文档同步完成后，调用 `superpowers:finishing-a-development-branch`，它会引导你选择：merge / 创建 PR / cleanup stale branches，并确认 CI 全绿后交付。
+
+**✅ Exit Criteria — Phase 9 完成标准：**
 - [ ] Spec 文档中每处偏离原设计的地方已标注 `> ⚠️ 原设计 vs 实际实现`
-- [ ] Spec 末尾追加了 Implementation Evolution Log（按时间线记录 Phase 1→7 关键决策）
+- [ ] Spec 末尾追加了 Implementation Evolution Log（按时间线记录 Phase 1→9 关键决策）
 - [ ] 失败的简化尝试（如有）已记录在 evolution log
 - [ ] Plan 文档中每个 task 有实际 commit SHA + 偏离点标注
 - [ ] 下游团队已收到接口 / 协议 / MQ 变更通知（如有）
+- [ ] `superpowers:finishing-a-development-branch` 完成：分支 merge / PR 创建 / CI 全绿
 
 ---
 
@@ -390,12 +451,14 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 |-------|------------|
 | 1 | `superpowers:brainstorming` |
 | 2 | `superpowers:writing-plans` |
-| 3 | `superpowers:subagent-driven-development` |
+| 3 | `superpowers:test-driven-development` + `superpowers:executing-plans` |
 | 4.1 | `superpowers:systematic-debugging` |
 | 4.2-4.5 | 自主 dispatch agent（本 skill 提供 prompt 模板，见 `references/cross-verification-techniques.md`）|
-| 5 | `superpowers:writing-plans` + `superpowers:subagent-driven-development` |
-| 6 | 自主执行（附带 `anti-patterns.md` 警示）|
-| 7 | 自主执行（附带 `doc-sync-playbook.md`）|
+| 5 | `superpowers:writing-plans` + `superpowers:executing-plans` |
+| 6 | `superpowers:verification-before-completion`（验收不通过 → 回 Phase 2）|
+| 7 | `superpowers:requesting-code-review` → `superpowers:receiving-code-review`（重大问题 → 回 Phase 4/5）|
+| 8 | 自主执行（附带 `anti-patterns.md` 警示）|
+| 9 | 自主执行（附带 `doc-sync-playbook.md`）+ `superpowers:finishing-a-development-branch` |
 
 ---
 
@@ -427,13 +490,15 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 ✅ Phase 1   (Brainstorming) → docs/superpowers/specs/<file>.md
 ✅ Phase 1.5 (Arch Pre-flight) → ADR 追加到 spec（或 N/A）
 ✅ Phase 2   (Planning) → docs/superpowers/plans/<file>.md
-⏳ Phase 3   (Implementation) → 进行中 (5/12 tasks done)
+⏳ Phase 3   (TDD + Implementation) → 进行中 (5/12 tasks done)
 ⬜ Phase 4a  (Systematic Debugging)
 ⬜ Phase 4b  (Cold-Context Review)
 ⬜ Phase 4c  (Diff Audit + Cross-Repo + Invariant，并行)
 ⬜ Phase 5   (Fix iteration)
-⬜ Phase 6   (Careful simplification)
-⬜ Phase 7   (Doc sync + 下游通知)
+⬜ Phase 6   (Verification-Before-Completion)  ← 验收不通过 → 回 Phase 2
+⬜ Phase 7   (Code Review: Requesting → Receiving)  ← 重大问题 → 回 Phase 4/5
+⬜ Phase 8   (Careful simplification)
+⬜ Phase 9   (Doc sync + Finishing-A-Development-Branch)
 ```
 
 ---
@@ -453,6 +518,9 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 | "Phase 7 文档同步等有空再补" | 有空永远不会来。Phase 5 的修复已经让代码偏离了原设计；不同步文档就是在给下一个维护者埋雷——他会按错误的文档写代码，踩同一个坑的变体（见 Case 6） |
 | "4 轮交叉验证太多了，挑 1-2 轮做就够" | 4 轮验证产生的 bug 信号**接近是并集而不是重复**。只做 4.1 找不到设计漏洞；只做 4.2 找不到跨仓库影响；省掉任何一轮都是系统性盲点，不是节省时间 |
 | "修复完了，不需要重跑 cold-context review" | 修复本身可能引入新 bug。修复后的代码对 reviewer 是全新的，能提供完全独立的信号。Phase 5 明确要求：所有 fix 合入后**至少重跑一次 4.2** |
+| "Phase 6 验收跳过，我知道功能是好的" | 知道和有证据是两回事。Phase 6 的价值不是"发现 bug"，而是**生成可复现的完成凭证**。没有凭证，Phase 7 reviewer 也无法有效工作，review 会退化成猜测 |
+| "review 意见不大，直接原地改就行，不用回 Phase 4/5" | 原地 patch 跳过了 TDD 流程（没有先写失败测试），也跳过了 Phase 4 的多轮交叉验证。修复越紧急，越容易引入新 bug。遵循回路代价只是半天，省掉可能是 incident |
+| "验收不通过只是小问题，补一补就好，不用回 Phase 2" | Phase 6 的回路触发条件是"设计偏差"，不是"有 bug"。如果是 bug，在 Phase 6 内修复即可。如果是设计无法达到 Success Criteria，继续打补丁只会把技术债推到生产 |
 
 ## Reference Files · 关键参考文件
 
@@ -471,7 +539,7 @@ Phase 3 结束后，代码**表面**已经能工作。但是**能编译 + 能过
 
 **Q：每个 Phase 都必须做吗？**
 
-A：Phase 1-3 + 7 必做。Phase 4 至少做 4.1 和 4.2。Phase 5-6 按需。4.3-4.5 视特性复杂度。
+A：Phase 1-3 + 6 + 7 + 9 必做。Phase 4 至少做 4.1 和 4.2。Phase 5 和 8 按需。4.3-4.5 视特性复杂度。
 
 **Q：Phase 4 的 4 轮验证要按顺序吗？**
 
@@ -483,7 +551,7 @@ A：**修复后只需重点重验被改动的部分**。不需要每次改动都
 
 **Q：这个工作流会不会太慢？**
 
-A：一个中等复杂度特性（~5 人日实施）用本工作流总共约 **7-10 人日**。多出的 40-50% 时间换来的是：**Critical bug 发现率从典型的 40% 提升到 95%**。对于关键特性，这个 ROI 是压倒性的正收益。
+A：一个中等复杂度特性（~5 人日实施）用本工作流总共约 **7-10 人日**。多出的 40-50% 时间换来的是：**Critical bug 发现率从典型的 40% 提升到 95%**。Phase 6 验收和 Phase 7 code review 在大多数高质量实施中仅需半天——只有在设计或实施存在系统性问题时才会触发回路，而那恰恰是最值得花时间的情况。对于关键特性，这个 ROI 是压倒性的正收益。
 
 **Q：前端/UI 特性能用这个工作流吗？**
 
