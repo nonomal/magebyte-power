@@ -171,7 +171,7 @@ Any ❌ must be auto-fixed or explicitly acknowledged before proceeding.
 
 Do NOT proceed to Phase 2 unless the user provides an **explicit** valid approval signal.
 Valid signals: "approve Phase 1" / "确认 Phase 1" / "Phase 1 OK, continue".
-Invalid signals (conversational acknowledgements, NOT approval): "looks good" / "continue" / "ok" / "好的" / "嗯".
+Invalid signals (conversational acknowledgements, NOT approval): "looks good" / "continue" / "ok" / "好的" / "嗯" / "就这样".
 </HARD-GATE>
 
 ---
@@ -222,8 +222,8 @@ grep -r "type.*Service interface" <repo>/internal/ --include="*.go" -l
 grep -r "db\.WriteDB\|db\.ReadDB\|sqlx" <repo>/internal/ --include="*.go" -l
 
 # 4. 找 MQ topics（跨服务消息）· Find MQ topics (cross-service messages)
-# Find MQ topic registries — adapt the pattern + path to your codebase
-grep -rE "topic[s]?\.|<your-broker-topic-slice>|<your-kafka-topic-slice>" <repo>/<your-mq-path>/ --include="*.<ext>"
+# Find MQ topic registries. Seed pattern below — adapt the symbol name + path + file ext to your codebase.
+grep -rE 'Topics\b|topic\.' <repo>/<your-mq-path>/ --include='*.go'
 
 # 5. 找 proto 定义（跨服务接口契约）· Find proto definitions (cross-service contracts)
 find <repo> -name "*.proto" | head -20
@@ -453,10 +453,12 @@ Each task must include:
 **文件 File**: `path/to/file.ext`（如修改现有文件带行号 · with line range if modifying existing file）
 **类型 Type**: 新增 add / 修改 modify / 删除 delete / 契约变更 contract change
 **尺寸 Size**: XS / S / M / L / XL
+**拆分被否决的理由 · Split rejection reason** (XL only): <reason — required if Size=XL>
 **spec-refs**:
-  - section: <h2 名 · h2 section name>   # 引用 spec 章节
-  - boundary: B-Always-1                 # B-{Always|AskFirst|Never}-{序号}
-  - invariant: I-3                       # 来自 spec 不变式清单
+  - section: "技术方案 · Technical Approach"   # 引用 spec h2 节标题（原文复制 · copy heading text verbatim）
+  - boundary: B-Always-1                       # 可多条 · multiple OK
+  - boundary: B-Never-2
+  - invariant: I-3                             # 可多条 · multiple OK
 
 **具体改动 · Specific Changes**:
 [用代码片段说明，不用散文描述 · Use code snippets, not prose]
