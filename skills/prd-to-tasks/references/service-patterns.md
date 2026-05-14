@@ -1,195 +1,124 @@
-# Service Code Patterns · 服务代码模式速查
-
-任务拆解（Phase 4）时，检查每个 task 是否触及以下模式并在任务里显式标注。
-During task breakdown (Phase 4), check whether each task touches any of the following patterns and explicitly annotate tasks that do.
-
----
-
-## P1: ID 生成 · ID Generation
-
-**规则 · Rule**：所有主键必须来自分布式 ID 服务，禁止 DB 自增 ID。
-All primary keys must come from the distributed ID service. DB auto-increment IDs are forbidden.
-
-```go
-id, err := idgen.NextID()
-if err != nil {
-    return err
-}
-```
-
-**触发时机 · When to apply**：任何需要创建新业务实体（订单、履约单、退款单、优惠券等）的 task。
-Any task that creates a new business entity (orders, fulfillment records, refund records, vouchers, etc.).
+> **Generic example / industry-neutral seed.** Copy to `~/.claude/prd-to-tasks/service-patterns.md` and customize with your project's actual helper function names, cache discipline, MQ topology, and ID generation strategy. This file documents principles, not specific API names — your real internal patterns belong in your local KB.
+>
+> **通用原则 seed。** 复制到 `~/.claude/prd-to-tasks/service-patterns.md` 后填入项目里实际的 helper 函数名、缓存策略、MQ 拓扑、ID 生成方案。本文件只列原则，不写具体 API — 你的真实内部模式应该放在本地 KB。
 
 ---
 
-## P2: DB 读写分离 · DB Read/Write Splitting
+# Service Patterns · 服务代码模式
 
-**规则 · Rule**：写走 `db.WriteDB`，读走 `db.ReadDB`（读副本）。
-Writes go to `db.WriteDB`, reads go to `db.ReadDB` (read replica).
+A reference for "things every task in this codebase must consider but a PRD won't mention".
 
-```go
-// 写 Write
-writeDB := db.WriteDB
-
-// 读（开启读副本路由）· Read (enable read-replica routing)
-ctx = db.WithReadReplica(ctx)
-
-// 或 middleware 层开启 · or enable at middleware level
-// read replica middleware
-```
-
-**触发时机 · When to apply**：所有 DB 访问 task。事务内不拆分读写。
-All DB access tasks. Do not split reads and writes inside a transaction.
+记录"本代码库里每个任务都要考虑、但 PRD 不会提的事"。
 
 ---
 
-## P3: Redis 缓存双删 · Redis Cache Double-Delete
+## Why this file exists · 为什么需要这个文件
 
-**规则 · Rule**：每次 DB 写操作后，对有 Redis mirror 的 key 执行延迟双删。
-After every DB write, execute a delayed double-delete on any Redis-mirrored key.
+PRD writers don't know about your codebase's:
+- ID generation conventions (auto-increment? Snowflake? UUIDv7? KSUID?)
+- Cache invalidation discipline (write-through? double-delete? TTL refresh?)
+- MQ topic registration (single registry? multiple slices that must sync?)
+- Distributed lock instances (which Redis? which key prefix?)
+- Idempotency-key conventions (request-id? domain-id+timestamp?)
 
-```go
-cache.DoubleDelete(ctx, key)
-```
+These are project-specific patterns. Capture YOUR project's actual conventions in your local copy, then reference them from each Phase 4 task with the `spec-refs` mechanism.
 
-**触发时机 · When to apply**：任何写 DB 且有对应 Redis 缓存的 task。不写双删 = 缓存可能长期脏读。
-Any task that writes to DB and has a corresponding Redis cache. Skipping the double-delete risks persistent stale reads from the cache.
-
----
-
-## P4: MQ Topics 同步 · MQ Topics Sync
-
-**规则 · Rule**：`internal/facade/mq/topic.go` 里有两个 slice 必须**同时**更新：`BrokerTopics`（内部 broker）和 `KafkaTopics`（直连 Kafka）。
-The file `internal/facade/mq/topic.go` contains two slices that must be updated **simultaneously**: `BrokerTopics` (internal broker) and `KafkaTopics` (direct Kafka).
-
-```go
-// 两个都要加，缺一不可 · Both must be updated — neither can be omitted
-var BrokerTopics = []string{
-    "order.booking.created",
-    // 新增 topic 加这里 · add new topics here
-}
-var KafkaTopics = []string{
-    "order.booking.created",
-    // 同步加这里 · keep in sync here
-}
-```
-
-**触发时机 · When to apply**：任何新增或修改 MQ 消息的 task。
-Any task that adds or modifies MQ messages.
+PRD 作者不知道你代码库里的具体约定。本文件让你把这些约定显式化，然后通过 Phase 4 任务的 `spec-refs` 反向引用。
 
 ---
 
-## P5: proto / shared-models 兼容性 · proto / shared-models Compatibility
+## P1: ID Generation · 主键 / 业务 ID 生成
 
-**规则 · Rules**：
-- 只允许**新增** field，不能修改或删除已有 field number
-  Only **adding** fields is allowed; modifying or deleting existing field numbers is forbidden
-- 不能重命名已有 service name、method name、field name
-  Renaming existing service names, method names, or field names is forbidden
-- 跨项目 proto 放 `shared-models`；项目内部 proto 放 `<project>/srvproto/`
-  Cross-project proto goes in `shared-models`; project-internal proto goes in `<project>/srvproto/`
-- package name 以 `pb` 结尾 · Package names end in `pb`
-- 只提交到 master 分支 · Only commit to the master branch
+**Principle · 原则**: Use your project's centralized ID generation helper, not database auto-increment, for any cross-service or business-meaningful ID. Auto-increment leaks DB-internal state into business APIs.
 
-```protobuf
-// 正确：新增 field（用下一个可用 number）
-// Correct: adding a new field (use the next available number)
-message OrderInfo {
-  int64 order_id = 1;
-  string status = 2;
-  // 新增 · new:
-  string platform_order_id = 3;  // ✅ 新增 field · adding new field
-}
+**项目实际方案 · Your project's actual choice** (TODO when you copy):
+- ID generator: Snowflake / UUIDv7 / KSUID / proprietary helper (replace with your choice)
+- Helper function name and import path: `<your-project>` (replace)
+- When to apply: Any task that creates a new business entity (orders, refunds, line items, etc.)
 
-// 错误：修改已有 field number
-// Wrong: modifying an existing field number
-// int64 old_field = 1; → string new_field = 1;  ❌
-```
-
-**触发时机 · When to apply**：任何需要修改跨服务接口契约的 task。
-Any task that modifies a cross-service interface contract.
+**Phase 4 task checklist line**: `- [ ] Use <your-id-helper> to generate the new entity's primary key (no auto-increment)`
 
 ---
 
-## P6: 日志规范 · Logging Standards
+## P2: Cache Invalidation Discipline · 缓存失效
 
-**规则 · Rule**：所有日志必须带 `requestID`，使用项目 logger helper。
-All log entries must include `requestID` and use the project logger helper.
+**Principle · 原则**: If your service uses cache-aside with a Redis (or similar) mirror of DB rows, every write must follow a consistent invalidation discipline. Choices commonly include:
+- **Write-through**: write DB then write cache
+- **Double-delete**: delete cache, write DB, delete cache again (after delay)
+- **TTL refresh**: write DB, let cache TTL handle staleness
+- **Cache version bump**: increment a version key, lazy-load fresh on next read
 
-```go
-log.InfoCtx(ctx, "doing X, param=%v order_id=%v", val, orderID)
-log.ErrorCtx(ctx, "failed to do X, err=%v", err)
-```
+Without a unified discipline, race conditions between concurrent writers produce stale reads.
 
-**触发时机 · When to apply**：所有新增业务逻辑路径的 task（入参、关键状态变更、错误路径至少各一条日志）。
-All tasks that add new business logic paths (at minimum: one log for input, one for key state change, one for error path).
+**项目实际方案 · Your project's actual choice** (TODO):
+- Discipline: `<write-through|double-delete|ttl|version-bump>` (pick one)
+- Helper / utility: `<your-cache-helper>` (replace)
+- When to apply: Any task that writes to a DB row mirrored in cache
 
----
-
-## P7: Service 层模式（旧框架）· Service Layer Pattern (Legacy Framework)
-
-所有 Service 暴露接口 + impl，scoped 到请求 context：
-All Services expose interface + impl, scoped to the request context:
-
-```go
-type BookingService interface {
-    CreateBooking(ctx context.Context, req *CreateBookingReq) (*CreateBookingResp, error)
-}
-
-type BookingServiceImpl struct {
-    base.SessionResource
-    // 依赖注入 · dependency injection
-}
-
-func NewBookingService(ctx context.Context) BookingService {
-    return &BookingServiceImpl{}
-}
-```
-
-**触发时机 · When to apply**：任何新增 Service 方法的 task。
-Any task that adds a new Service method.
+**Phase 4 task checklist line**: `- [ ] After DB write, follow <your-cache-discipline> using <your-cache-helper>`
 
 ---
 
-## P8: 事务内 DB 传递 · DB Handle in Transactions
+## P3: MQ Topic Registration · MQ topic 注册
 
-**规则 · Rule**：事务内传 `*sqlx.Tx` 或 `db.Execer` 接口，不共享全局 DB 句柄。
-Inside a transaction, pass `*sqlx.Tx` or the `db.Execer` interface — never share the global DB handle.
+**Principle · 原则**: If your stack maintains multiple message-broker registries (e.g., internal broker + Kafka, or Pulsar + RocketMQ for cross-region), every new topic must be registered in ALL of them. Forgetting one creates silent message drops.
 
-```go
-// 正确：通过参数传递 tx · Correct: pass tx via parameter
-func (s *BookingServiceImpl) createWithTx(ctx context.Context, execer db.Execer, ...) error {
-    // execer 可以是 *sqlx.DB 或 *sqlx.Tx，统一接口
-    // execer can be *sqlx.DB or *sqlx.Tx — uniform interface
-}
-```
+**项目实际方案 · Your project's actual choice** (TODO):
+- Registry files: list all paths (e.g. `internal/mq/registry.go`) where topics are declared
+- Topic naming convention: `<domain>.<entity>.<event>` (replace with yours)
 
-**触发时机 · When to apply**：任何涉及多表写入、需要事务保证原子性的 task。
-Any task involving multi-table writes that require transactional atomicity.
+**Phase 4 task checklist line**: `- [ ] If introducing a new MQ topic, register in all <N> broker registry files in sync`
 
 ---
 
-## 快速 checklist（Phase 4 每个 task 过一遍）· Quick Checklist (run through for every task in Phase 4)
+## P4: Distributed Locks · 分布式锁
+
+**Principle · 原则**: Concurrency-sensitive operations (state machine transitions, financial mutations, inventory decrements) need a distributed lock or other atomicity guarantee. Lock instances, key prefixes, and timeout policies must be consistent across services that share the same logical resource.
+
+**项目实际方案 · Your project's actual choice** (TODO):
+- Lock instance(s): which Redis / etcd cluster
+- Key prefix convention: `<service>:<resource>:<id>`
+- Timeout default: <N>s
+- Reentrancy: <yes|no>
+
+**Phase 4 task checklist line**: `- [ ] Acquire <your-lock-helper> with key '<convention>' before <operation>`
+
+---
+
+## P5: Idempotency Keys · 幂等键
+
+**Principle · 原则**: Operations that may be retried (payments, refunds, order creation) need an idempotency mechanism. Idempotency keys are typically derived from a stable upstream identifier (e.g., booking-id, request-id), not server-generated.
+
+**项目实际方案 · Your project's actual choice** (TODO):
+- Idempotency key source: <upstream-request-id | domain-id | tuple>
+- Storage: <db-unique-constraint | redis-with-ttl | dedupe-table>
+- TTL: <N>
+
+**Phase 4 task checklist line**: `- [ ] Use idempotency key from <source>; reject duplicate on conflict`
+
+---
+
+## P6: Shared-contracts / Proto Discipline · 跨服务契约纪律
+
+**Principle · 原则**: Shared schema (proto / shared-models / shared-types) is consumed by multiple services. Modifying an existing field (renaming, changing type, reusing a field number/tag) breaks consumers silently. Only **add** new fields with new numbers/tags; never modify existing ones.
+
+**项目实际方案 · Your project's actual choice** (TODO):
+- Shared-contracts repo path: <repo>
+- Compatibility tool / linter: <buf / protolock / your-tool>
+
+**Phase 4 task checklist line**: `- [ ] All shared-contract changes are field additions only; existing field numbers/tags unchanged; verified by <your-tool>`
+
+---
+
+## Quick reference · 速查
+
+When breaking down a Phase 4 task, walk through this checklist:
 
 ```
-□ 创建新业务实体？  → P1 idgen.NextID()
-  Creating new business entity?
-
-□ 写 DB？          → P2 读写分离 read/write split + P3 双删 Redis double-delete（如有缓存 if cached）
-  Writing to DB?
-
-□ 新增 MQ topic？   → P4 BrokerTopics + KafkaTopics 同步 sync both slices
-  Adding new MQ topic?
-
-□ 改 proto？        → P5 只新增 field，不改 field number · only add fields, never change field numbers
-  Modifying proto?
-
-□ 写业务日志？      → P6 带 requestID · include requestID
-  Writing business logs?
-
-□ 新增 Service？    → P7 接口 + impl 模式 · interface + impl pattern
-  Adding new Service?
-
-□ 跨表事务？        → P8 传 db.Execer 接口 · pass db.Execer interface
-  Cross-table transaction?
+□ 创建新业务实体? · Creating new business entity?              → P1
+□ 写 DB 行有缓存镜像? · Writing DB row with cache mirror?      → P2
+□ 新增 MQ topic? · New MQ topic?                              → P3
+□ 状态机转换 / 资金变更 / 库存扣减? · State / money / stock?  → P4
+□ 操作可重试? · Operation retryable?                          → P5
+□ 改 shared-contract? · Shared contract changes?               → P6
 ```
