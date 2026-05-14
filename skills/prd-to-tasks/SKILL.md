@@ -205,6 +205,12 @@ Start scanning only after the user confirms paths. If the user says "I'm not sur
 
 #### 2.1 扫描优先级 · Scan Priority
 
+**工具优先级 · Tool Priority**：
+
+如目标语言的 LSP 服务可用（如 Go 的 `gopls`、Python 的 `pyright`、TypeScript 的 `typescript-language-server`），**优先**用 LSP 的 references / implementations / call hierarchy 调用替代 grep — LSP 能解析 symbol 语义，grep 容易漏识别接口实现关系。LSP 不可用时降级为下面的 grep + find 组合。
+
+If target-language LSP is available (e.g. `gopls` for Go, `pyright` for Python, `typescript-language-server` for TypeScript), **prefer** LSP `references` / `implementations` / `call hierarchy` calls over grep — LSP resolves symbol semantics, while grep often misses interface-implementation relations. Fall back to the grep + find combo below if LSP is unavailable.
+
 ```bash
 # 1. 找入口 handler（接口定义）· Find entry handlers (interface definitions)
 grep -r "func.*Handler\|router\.\(GET\|POST\|PUT\)" <repo>/cmd/ --include="*.go" -l
@@ -224,24 +230,44 @@ find <repo> -name "*.proto" | head -20
 
 #### 2.2 扫描产出 · Scan Output
 
-整理出一张**受影响范围表**：
-Produce an **affected scope table**:
+整理出一张**受影响范围表**（含 confidence 列）：
+Produce an **affected scope table** (with confidence column):
 
-```
-受影响文件（初步）· Affected Files (preliminary):
-├── order-service/internal/service/booking/booking_service.go  [修改 modify]
-│   └── CreateBooking(): 需要加 platform_order 分支
-│       needs platform_order branch
-├── order-service/internal/facade/mq/topic.go                  [修改 modify]
-│   └── BrokerTopics + KafkaTopics 需同步新增 topic
-│       need to add topic to both slices in sync
-├── shared-models/proto/order/order.proto                       [修改? modify?]
-│   └── 待确认是否需要新增字段 · pending confirmation on new field
-└── platform-order-service/internal/service/order_v2/          [新增消费者 new consumer]
-```
+| 文件 File | 影响类型 Impact | 改动点 Change | Confidence |
+|----------|----------------|--------------|------------|
+| `order-service/internal/service/booking/booking_service.go` | 修改 modify | `CreateBooking()`: 加入 feature flag 分支 · add feature flag branch | 高 high — directly named in PRD |
+| `order-service/internal/facade/mq/topic.go` | 修改 modify | MQ topic 注册表需同步新增 topic · MQ topic registries need new topic in sync | 中 medium — pattern-matched from KB |
+| `<shared-contracts-repo>/proto/order.proto` | 修改? modify? | 待确认是否需要新增字段 · pending confirmation on new field | 低 low — needs user input |
+| `platform-order-service/internal/service/order_v2/` | 新增消费者 new consumer | new file required | 高 high |
+
+`confidence` 列三个值 · Three values:
+- **高 / high**：PRD 直接点名、或 KB 中有精确模式匹配 · PRD directly names it, or exact KB pattern match
+- **中 / medium**：模式推断，需要 Phase 3 spec 中再确认 · Inferred from pattern, confirm in Phase 3 spec
+- **低 / low**：仅初步假设，须形成 Open Question · Tentative assumption, must become Open Question
 
 扫描过程中发现的**隐性风险**（如发现并发写、无幂等保护、旧版本兼容问题）立刻标注 ⚠️ 并纳入 Phase 3 的不变式清单。
 Any **hidden risks** discovered during scanning (e.g. concurrent writes, missing idempotency protection, backward compatibility issues) must be flagged immediately with ⚠️ and added to the Phase 3 invariants list.
+
+#### 2.3 KB 演进协议 · Knowledge Base Evolution Protocol
+
+扫描结束后，对每个**未在当前 KB 中**找到对应映射的服务/模式，列出"候选新 KB 条目"清单：
+
+After scanning, for each service/pattern not found in the currently loaded KB, list a "candidate new KB entry":
+
+```
+扫描发现以下新映射，KB 中尚无对应条目。要追加到 ~/.claude/prd-to-tasks/repo-map.md 吗？
+Discovered the following new mappings; no corresponding entries in KB. Append to ~/.claude/prd-to-tasks/repo-map.md?
+
+候选条目 · Candidate entries:
+- "<requirement-signal>" → <service-name>  [user 确认 add / skip]
+- "<another-signal>" → <another-service>   [user 确认 add / skip]
+```
+
+**规则 · Rule**：
+- 用户必须**显式同意**才会写入（与 HARD-GATE 协议一致）· User must give explicit approval (same as HARD-GATE protocol)
+- 本 skill **永不静默写入 KB** · This skill **never silently writes to KB**
+- 写入时显示完整 diff 给用户 · Show full diff to user before write
+- 默认写入 `~/.claude/prd-to-tasks/`（用户级）；如检测到项目级 `.claude/prd-to-tasks/` 存在且更适合，询问写哪一层 · Default write target is user-level; if project-level KB exists and seems more appropriate, ask which layer to write
 
 ---
 
