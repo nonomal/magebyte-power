@@ -213,42 +213,66 @@ ls ~/.agents/skills/prd-to-tasks/SKILL.md
 
 需求文档描述的是「做什么」，不告诉你「在哪里做」——哪些服务受影响、要改哪些文件、要检查哪些模式。从「PM 发来一个文档」到「我手里有一份带文件路径和验证命令的可执行任务清单」，这中间的时间通常花在漫无目的地翻代码上。
 
-**这个 Skill 用 5 阶段结构化流水线解决这个问题：**
+**这个 Skill 用 6 阶段结构化流水线 + 用户可演进的知识库解决这个问题：**
 
 ```
-Phase 0: PRD 摄取      → Feishu/Lark 链接、粘贴文本或本地文件
-Phase 1: 范围 + 风险定级 → 映射受影响服务，定级 🔴/🟡/🟢（门控）
-Phase 2: 代码库扫描    → 定位真实文件路径、接口、DB 表
-Phase 3: Spec 生成     → 含不变式和失败模式的结构化设计文档（门控）
-Phase 4: 任务拆解      → 带文件路径 + 行号 + 验证命令的可执行任务（门控）
-Phase 5: 工作流路由    → 自动路由到 cross-verified 或 superpowers 标准流程
+Phase 0: PRD 摄取        → Lark / 粘贴文本 / 本地文件
+Phase 1: 范围 + PM 审计   → 10 项 PM 范围澄清清单 + 🔴/🟡/🟢 风险定级（含审计线索）（HARD-GATE）
+Phase 2: 代码库扫描      → LSP 优先；带 confidence 列的影响表；提议新 KB 条目
+Phase 3: Spec 生成       → YAML frontmatter + Boundaries 三段（Always/AskFirst/Never）+ 不变式 + Open Questions 表（HARD-GATE）
+Phase 4: 任务拆解        → XS–XL 尺寸 + spec-refs 反向引用 + Mermaid DAG + plan frontmatter（HARD-GATE）
+Phase 5: 工作流路由      → Plan 文件 frontmatter `routed-to:` 机读契约 → 下游 skill
+
+         + Knowledge Base → 3 层加载：项目 / 用户 / skill seed（~/.claude/prd-to-tasks/）
 ```
+
+### v2 亮点
+
+- **HARD-GATE** 在 Phase 1 / 3 / 4 — 必须用户**显式**说出"approve Phase N" / "确认 Phase N"才能进入下一阶段；"ok / 好的 / 嗯"不算。
+- **10 项 PM 范围澄清清单**驱动 Phase 1 — JTBD、Not Doing、v2 推迟项、极端失败模式、回滚指标、成功指标、合规审计…
+- **Boundaries 三段** 写入 Spec — Always-do / Ask-first / Never-do 带稳定 ID（B-Always-N、B-Never-N），任务通过 spec-refs 反向引用。
+- **每个任务带 spec-refs** — `spec-refs:` 把任务映射回它实现的 spec 节 / Boundary / Invariant；Phase 4 自检强制完整性。
+- **XS–XL 尺寸 + Mermaid 任务 DAG** — 关键路径与可并行批次一眼可见；XL 必须给出"否决拆分的理由"。
+- **Plan frontmatter 路由** — `routed-to: cross-verified-feature-development | superpowers:writing-plans | direct` 是机读交付契约，不是口头建议。
+- **可演进知识库** — `repo-map.md` / `service-patterns.md` 落地在 `~/.claude/prd-to-tasks/`（个人）或 `<repo>/.claude/prd-to-tasks/`（团队共享，跟代码 git 管理）。Phase 2 扫描可建议新映射，但**永不静默写入**，必须用户显式同意。
 
 ### 任务质量的差异
 
 通用 spec 工具产出的是：*「实现用户登录 → 修改 UserService」*
 
 本 Skill 产出的是：
-> 在 `order-service/internal/service/booking/booking_service.go:142` 的 `CreateBooking` 方法中加入 feature flag 检查，flag key 为 `platform_order_v2_enabled`，用 `idgen.NextID()` 生成新单据 ID，写 `db.WriteDB`，写后执行 `cache.DoubleDelete(ctx, key)` — `make build && make test`。
+> 在 `order-service/internal/service/booking/booking_service.go:142` 的 `CreateBooking` 方法中加入 feature flag 检查（key 取自你项目的 flag 命名约定），使用项目 KB（`~/.claude/prd-to-tasks/service-patterns.md`）中记录的 ID 生成 helper 创建新单据 ID，写入数据库，写后按项目缓存失效协议执行失效——然后跑项目约定的 `build` + `test` 命令。
+
+Skill 之所以知道「你项目的 ID 生成 helper」「你项目的缓存失效协议」具体是什么，是因为你在 `~/.claude/prd-to-tasks/service-patterns.md` 里写过一次。之后每个 task 自动继承这份知识。
 
 ### 风险路由
 
-| 风险层级 | 判定标准 | 路由到 |
-|---------|---------|-------|
+Phase 5 把决定写入 plan 文件 frontmatter `routed-to:` 字段——下游 skill 凭固定路径取货，不是口头交付。
+
+| 风险层级 | 判定标准 | `routed-to:` |
+|---------|---------|--------------|
 | 🔴 Critical | 资金流、状态机、分布式锁、MQ 协议变更、schema 迁移 | `cross-verified-feature-development` |
-| 🟡 High | ≥ 3 人日、多仓库联动、核心订单路径改造 | `brainstorming` → `writing-plans` → `subagent-driven-development` |
-| 🟢 Standard | 纯新增接口、无状态机语义、单仓库、< 3 人日 | `writing-plans` → 直接实施 |
+| 🟡 High | ≥ 3 人日、多仓库联动、核心路径 | `superpowers:writing-plans` → `subagent-driven-development` |
+| 🟢 Standard | 纯新增接口、无状态机语义、单仓库、< 3 人日 | `direct`（你直接读 spec + 任务清单实施）|
 
-### 安装后必做一步
+### 初始化你的本地 KB
 
-`references/repo-map.md` 是一份服务映射模板——把里面的占位服务名替换成你团队的真实仓库和服务名。**这里的准确度直接决定任务拆解的质量。**
+仓库自带的 `references/*.md` 是**行业通用 seed**。你真实代码库的映射应该住在本地 KB：
 
-### 内含参考文件
+```bash
+mkdir -p ~/.claude/prd-to-tasks
+cp ~/.claude/skills/prd-to-tasks/references/*.md ~/.claude/prd-to-tasks/
+# 然后按你的技术栈改写：服务名、ID 生成 helper、缓存策略、MQ 拓扑、幂等约定
+```
 
-| 文件 | 何时读 | 内容 |
-|------|-------|------|
-| `references/service-patterns.md` | Phase 4 拆任务时 | 8 个 Go 微服务代码模式（每个任务应检查的清单）|
-| `references/repo-map.md` | Phase 1 识别受影响服务时 | 团队自定义的服务 → 仓库映射表 |
+skill 在 Phase 0 自动检测这个目录并优先使用，bundled seed 是 fallback。**团队共享**的映射可以放在 `<repo>/.claude/prd-to-tasks/`（项目级——优先级高于用户级）。
+
+### 内含参考文件（seed 模板）
+
+| 文件 | 内容 |
+|------|------|
+| `references/repo-map.md` | 通用电商服务映射模板——按你的真实服务名改写 |
+| `references/service-patterns.md` | 6 条原则模板（ID 生成 / 缓存失效 / MQ topic 注册 / 分布式锁 / 幂等 / 跨服务契约）——填入你项目的实际 helper |
 
 ---
 

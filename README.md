@@ -205,42 +205,66 @@ ls ~/.agents/skills/prd-to-tasks/SKILL.md
 
 PRD documents describe *what* to build. They don't tell you *where* in the codebase to build it, which services are affected, or what patterns are required. The gap between "PM handed me a doc" and "I have executable tasks with file paths and verify commands" is where hours disappear.
 
-**This skill closes that gap with a 5-phase structured pipeline:**
+**This skill closes that gap with a 6-phase structured pipeline + a user-evolved knowledge base:**
 
 ```
-Phase 0: PRD Ingestion      → Feishu/Lark URL, pasted text, or local file
-Phase 1: Scope & Risk       → Map to affected services, classify 🔴/🟡/🟢 (gate)
-Phase 2: Codebase Scan      → Locate real file paths, interfaces, DB tables
-Phase 3: Spec Generation    → Structured design doc with invariants & failure modes (gate)
-Phase 4: Task Breakdown      → Tasks with file paths, line numbers, verify commands (gate)
-Phase 5: Workflow Routing   → Auto-route to cross-verified or standard superpowers flow
+Phase 0: PRD Ingestion       → Lark / pasted text / local file
+Phase 1: Scope + PM Audit    → 10-item PM scope checklist + 🔴/🟡/🟢 risk classification with audit trail (HARD-GATE)
+Phase 2: Codebase Scan       → LSP-first; confidence-tagged affected scope; propose new KB entries
+Phase 3: Spec Generation     → YAML frontmatter + Boundaries (Always/AskFirst/Never) + Invariants + Open Questions table (HARD-GATE)
+Phase 4: Task Breakdown      → XS–XL sizing + spec-refs back-references + Mermaid DAG + plan frontmatter (HARD-GATE)
+Phase 5: Workflow Routing    → Plan-header `routed-to:` machine-readable contract → downstream skill
+
+         + Knowledge Base    → 3-tier loading: project / user / skill-seed (~/.claude/prd-to-tasks/)
 ```
+
+### v2 highlights
+
+- **HARD-GATE** at Phase 1 / 3 / 4 — phases advance only on explicit approval ("approve Phase N" / "确认 Phase N"); conversational "ok" doesn't count.
+- **10-item PM scope-clarity checklist** drives Phase 1 — JTBD, Not Doing, Deferred-to-v2, worst-case failure, rollback trigger, success metrics, …
+- **Boundaries triad** in Spec — Always-do / Ask-first / Never-do entries with stable IDs (B-Always-N, B-Never-N), back-referenced by tasks.
+- **Spec-refs on every task** — `spec-refs:` maps tasks back to the spec sections / Boundaries / Invariants they implement; Phase 4 gate self-check enforces completeness.
+- **XS–XL sizing + Mermaid task DAG** — critical path and parallelizable batches visible at a glance; XL must justify its rejection of further splitting.
+- **Plan frontmatter routing** — `routed-to: cross-verified-feature-development | superpowers:writing-plans | direct` is a machine-readable hand-off contract, not a verbal recommendation.
+- **Evolvable Knowledge Base** — `repo-map.md` / `service-patterns.md` live in `~/.claude/prd-to-tasks/` (per-user) or `<repo>/.claude/prd-to-tasks/` (team-shared via git). Phase 2 proposes new mappings with explicit user approval — never silent writes.
 
 ### What makes tasks different
 
 Generic spec tools produce: *"implement user login → modify UserService"*
 
 This skill produces:
-> In the `CreateBooking` method at `order-service/internal/service/booking/booking_service.go:142`, add a feature flag check with key `platform_order_v2_enabled`, use `idgen.NextID()` to generate the new record ID, write to `db.WriteDB`, then execute `cache.DoubleDelete(ctx, key)` after the write — `make build && make test`.
+> In the `CreateBooking` method at `order-service/internal/service/booking/booking_service.go:142`, add a feature flag check (key from your project's flag conventions), generate the primary key with your project's centralized ID helper (documented in your KB's `service-patterns.md`), write to the DB, then follow your project's cache invalidation discipline — finally run your project's `build` + `test` commands.
+
+The skill knows about *"your project's centralized ID helper"* and *"your project's cache invalidation discipline"* because you've documented them once in `~/.claude/prd-to-tasks/service-patterns.md`. Every future task inherits that knowledge automatically.
 
 ### Risk routing
 
-| Risk level | Criteria | Routes to |
-|-----------|----------|-----------|
+Phase 5 writes the decision to the plan file's frontmatter `routed-to:` field — downstream skills consume by fixed path, not by verbal hand-off.
+
+| Risk level | Criteria | `routed-to:` |
+|-----------|----------|--------------|
 | 🔴 Critical | Financial flows, state machines, distributed locks, MQ contracts, schema migration | `cross-verified-feature-development` |
-| 🟡 High | ≥ 3 person-days, multi-repo, core order path | `brainstorming` → `writing-plans` → `subagent-driven-development` |
-| 🟢 Standard | New endpoints, stateless, single repo, < 3 days | `writing-plans` → implement |
+| 🟡 High | ≥ 3 person-days, multi-repo, core path | `superpowers:writing-plans` → `subagent-driven-development` |
+| 🟢 Standard | New endpoints, stateless, single repo, < 3 days | `direct` (you read spec + tasks and implement) |
 
-### Setup required
+### Bootstrap your local KB
 
-`references/repo-map.md` is a team-customizable service map — replace the placeholder service names with your actual repos and services. **Accuracy here directly affects task quality.**
+The bundled `references/*.md` files are **industry-neutral seeds**. Your actual codebase mappings should live in your local KB:
 
-### Bundled reference files
+```bash
+mkdir -p ~/.claude/prd-to-tasks
+cp ~/.claude/skills/prd-to-tasks/references/*.md ~/.claude/prd-to-tasks/
+# Then edit to reflect your stack: services, ID helpers, cache discipline, MQ topology, idempotency conventions
+```
 
-| File | When to read |
-|------|-------------|
-| `references/service-patterns.md` | Phase 4 — 8 Go microservice patterns every task should check |
-| `references/repo-map.md` | Phase 1 — customize with your team's services and repos |
+The skill auto-detects this directory on Phase 0 and prefers it over the bundled seed. **Team-shared mappings** can live in `<repo>/.claude/prd-to-tasks/` (project-level — takes priority over user-level).
+
+### Bundled reference files (seed templates)
+
+| File | Content |
+|------|---------|
+| `references/repo-map.md` | Generic e-commerce service map — replace with your real service names |
+| `references/service-patterns.md` | 6 principle templates (ID generation / cache invalidation / MQ topic registration / distributed locks / idempotency / shared contracts) — fill in your project's actual helpers |
 
 ---
 
