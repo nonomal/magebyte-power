@@ -289,7 +289,7 @@ feature: <kebab-case-name>
 prd-source: lark://docx/xxx 或 docs/prd/xxx.md 或 inline
 risk-level: 🔴 Critical | 🟡 High | 🟢 Standard
 affected-repos: [repo-a, repo-b]
-spec-status: draft | approved | superseded
+spec-status: draft | approved | superseded   # HARD-GATE 通过后 skill 自动更新为 approved · skill auto-updates to `approved` on HARD-GATE pass
 created: YYYY-MM-DD
 owner: <handle-or-email>
 ---
@@ -304,19 +304,24 @@ owner: <handle-or-email>
 |-------------|----------|---------------------|
 
 ## 技术方案 · Technical Approach
-[核心技术路径 · Core technical path]
+[核心技术路径。每个关键决策点写明：选了什么，为什么不选备选方案
+ Core technical path. For each key decision point: what was chosen, why alternatives were rejected]
 
 ## 边界 · Boundaries
 
 ### Always do · 必做（不需要再问 · no further confirmation needed）
-- B-Always-1: ...
+- B-Always-1: ... (→ 技术方案 §X · backref to tech-approach decision)
 - B-Always-2: ...
 
 ### Ask first · 先问再做（人在回路 · human-in-the-loop）
-- B-AskFirst-1: ...
+- B-AskFirst-1: ... (→ 技术方案 §X · backref to tech-approach decision)
 
 ### Never do · 严禁（红线 · red line）
-- B-Never-1: ...
+- B-Never-1: ... (→ 技术方案 §X · backref to tech-approach decision)
+
+> **Boundaries vs 不变式 · Boundaries vs Invariants**: Invariants = 系统/数据状态永远成立的命题（如"同一 booking_id 最多一次资金变动"）。Boundaries = agent 应执行/可执行/不可执行的**动作**。资金安全相关的命题可能两者都涉及——优先归入 Invariants（描述状态命题），Never-do 仅列对应的禁止动作。
+>
+> Invariants = propositions that always hold over system/data state. Boundaries = **actions** an agent should perform / may perform with human-in-the-loop / must not perform. Financially-sensitive items may touch both — prefer Invariants for the state proposition; Never-do should list only the forbidden corresponding action.
 
 (每条带 ID，用于 Phase 4 task 反向引用 · Each entry has an ID for Phase 4 task back-references)
 
@@ -327,7 +332,7 @@ owner: <handle-or-email>
 [DB schema diff / proto field 变更 · DB schema diff / proto field changes]
 
 ## 不变式清单 · Invariants
-- I-1: ...
+- I-1: ... (→ 技术方案 §X · backref to tech-approach decision)
 - I-2: ...
 (每条带 ID，用于 task 反向引用 · Each entry has an ID for task back-references)
 
@@ -355,6 +360,8 @@ owner: <handle-or-email>
 | # | 问题 Question | 影响 Impact | Owner | Deadline | 状态 Status |
 |---|--------------|------------|-------|----------|------------|
 | Q1 | ... | ... | @user | YYYY-MM-DD | open |
+
+（状态 Status 枚举 · enum: `open` | `answered` | `deferred`）
 ```
 
 #### 3.1 Phase 3 自检 checklist · Self-check before gate
@@ -380,7 +387,7 @@ Any ❌ — auto-fix first; if unfixable, convert to a new Open Question for use
 
 Do NOT proceed to Phase 4 unless the user provides an **explicit** valid approval signal.
 Valid signals: "approve Phase 3" / "确认 Phase 3" / "Phase 3 OK, continue".
-Invalid signals: "looks good" / "continue" / "ok" / "好的" / "嗯".
+Invalid signals: "looks good" / "continue" / "ok" / "好的" / "嗯" / "就这样".
 </HARD-GATE>
 
 ---
