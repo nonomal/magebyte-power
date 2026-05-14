@@ -32,26 +32,32 @@ This skill produces tasks like:
 
 ---
 
-## 5 阶段工作流 · 5-Phase Workflow
+## 6 阶段工作流 · 6-Phase Workflow
 
 ```
-Phase 0: PRD 摄取      → 读取文档 / 粘贴文本
-         PRD Ingestion  → Read doc / paste text
+Phase 0:   PRD 摄取        → 读取文档 / 粘贴文本
+           PRD Ingestion    → Read doc / paste text
 
-Phase 1: 范围澄清      → 识别服务、风险定级（门控：人工确认）
-         Scope Clarity  → Identify services, risk classification (gate: human confirmation)
+Phase 1:   范围澄清与风险定级（门控：人工确认）
+           Scope Clarity & Risk Classification (gate: human confirmation)
 
-Phase 2: 代码库扫描    → 找受影响的文件、接口、DB 表
-         Codebase Scan  → Find affected files, interfaces, DB tables
+  Phase 1.0: PRD 合理性调研 → 拉取 Lark 关联文档 + 全量加载 KB + 代码定向探针
+             PRD Feasibility  → Fetch referenced Lark docs + full KB load + targeted codebase probe
 
-Phase 3: Spec 生成     → 结构化设计文档（门控：人工确认）
-         Spec Gen       → Structured design doc (gate: human confirmation)
+  Phase 1.1–1.4: 识别服务、PM 清单、风险定级（基于 1.0 调研结论）
+                  Identify services, PM checklist, risk classification (informed by 1.0)
 
-Phase 4: 任务拆解      → 带路径 + 模式引用的可执行任务（门控：人工确认）
-         Task Breakdown → Executable tasks with paths + pattern references (gate: human confirmation)
+Phase 2:   代码库深度扫描  → 找受影响的文件、接口、DB 表（全量）
+           Deep Codebase Scan → Find affected files, interfaces, DB tables (comprehensive)
 
-Phase 5: 工作流路由    → 决定接下来走哪个 superpowers 流程
-         Workflow Route → Decide which superpowers flow to follow next
+Phase 3:   Spec 生成       → 结构化设计文档（门控：人工确认）
+           Spec Gen         → Structured design doc (gate: human confirmation)
+
+Phase 4:   任务拆解        → 带路径 + 模式引用的可执行任务（门控：人工确认）
+           Task Breakdown   → Executable tasks with paths + pattern references (gate: human confirmation)
+
+Phase 5:   工作流路由      → 决定接下来走哪个 superpowers 流程
+           Workflow Route   → Decide which superpowers flow to follow next
 ```
 
 每个门控阶段必须等人工确认后才进入下一阶段。
@@ -82,8 +88,8 @@ The skill enumerates all `*.md` files in the KB directory at load time. Common b
 
 | 文件 File | 内容 Content | 何时读 When read |
 |----------|-------------|------------------|
-| `repo-map.md` | 需求信号 → 受影响服务/仓库 · Requirement signal → affected services/repos | Phase 1.1 |
-| `service-patterns.md` | 内部代码模式（ID 生成、缓存失效、MQ topic 注册 等）· Internal patterns | Phase 4 task checklist |
+| `repo-map.md` | 需求信号 → 受影响服务/仓库 · Requirement signal → affected services/repos | Phase 1.0（PRD 可行性验证）+ Phase 1.1 |
+| `service-patterns.md` | 内部代码模式（ID 生成、缓存失效、MQ topic 注册 等）· Internal patterns | **Phase 1.0**（验证 PRD 与现有模式兼容性 · validate PRD compatibility with existing patterns）+ Phase 4 task checklist |
 | `<custom>.md` | 用户自定义（例 `state-machine-conventions.md`、`team-owners.md`）· User-custom | 全局，skill 自行判断何时引用 |
 
 ### Bootstrap 协议 · Bootstrap Protocol
@@ -147,6 +153,82 @@ After ingestion, summarize the **core business goal** in 2-3 sentences and ask t
 
 ### Phase 1: 范围澄清与风险定级 · Scope Clarification & Risk Classification
 
+#### 1.0 PRD 合理性调研 · PRD Feasibility Research
+
+在开始范围评估前，主动收集上下文，判断 PRD 的技术可行性。**不调研就评估 = 盲目评估**：此时缺乏代码依据，风险定级可能失准，PM 清单中很多本可自答的问题会白白浪费用户时间。
+
+Before scope assessment, proactively gather context to evaluate PRD technical feasibility. **Evaluating without research = blind assessment**: risk classification lacks code evidence, and PM checklist items that could be self-answered will waste the user's time.
+
+**调研三层，按顺序执行 · Three research layers, execute in order:**
+
+**A. Lark 文档调研 · Lark Document Research**
+
+扫描 PRD 正文，提取所有 Lark 链接（`feishu.cn/docx/`、`feishu.cn/wiki/` 等），逐一拉取：
+Scan PRD body for all Lark links, fetch each:
+
+```bash
+lark-cli docs +fetch --doc "<referenced-url>"
+```
+
+重点提取：历史技术方案与设计决策、相关接口文档、前置 PRD 中已有的约束与结论。
+Extract: historical tech decisions, related API docs, constraints from predecessor PRDs.
+
+**B. 知识库全量加载 · Full KB Load**
+
+读取 KB 目录下**所有** `.md` 文件（含 `service-patterns.md`，不只是 `repo-map.md`）：
+Load **all** `.md` files in KB directory (including `service-patterns.md`, not just `repo-map.md`):
+
+```
+<CWD>/.claude/prd-to-tasks/*.md  →  repo-map + service-patterns + 所有自定义
+~/.claude/prd-to-tasks/*.md       →  用户级 KB
+```
+
+重点关注：PRD 所述的业务流程，与 KB 中记录的现有代码模式（ID 生成规范、缓存失效协议、MQ topic 注册方式等）是否兼容。
+Focus: whether the business flows described in PRD are compatible with existing code patterns in KB.
+
+**C. 代码库定向探针 · Targeted Codebase Probe**
+
+对 PRD 的**核心技术声明**做定向探查。目标是**验证 PRD 假设**，不是全量扫描（全量扫描在 Phase 2）。
+
+Probe the codebase for PRD's **core technical claims**. Goal: **validate PRD assumptions**, NOT comprehensive scanning (that's Phase 2).
+
+如 CWD 包含相关代码 → 直接探查，无需等用户提供路径。否则询问关键仓库路径（用户可回答"稍后在 Phase 2 再提供"，此时该假设标记为 ⚠️ 待验）。
+
+If CWD contains relevant code → probe directly, no need to ask for paths. Otherwise ask for key repo paths (user may say "provide in Phase 2" — that assumption is then marked ⚠️ pending).
+
+```bash
+# 针对 PRD 声明的核心 symbol/模块做定向 grep · Targeted grep for core symbols/modules from PRD
+grep -r "<prд-mentioned-symbol>" <repo>/internal/ --include="*.go" -l
+
+# 检查 PRD 涉及的状态机/枚举是否已存在 · Check if state machines/enums from PRD already exist
+grep -r "type.*Status\|State\b" <repo>/internal/ --include="*.go" -l
+```
+
+**1.0 产出：PRD 假设验证报告 · PRD Assumption Validation Report**
+
+对 PRD 中每个关键假设，标注验证状态：
+For each key PRD assumption, mark validation status:
+
+```
+PRD 假设验证 · PRD Assumption Validation:
+
+✅ 假设成立：<assumption> — 代码/KB/Lark 已有 <symbol>（路径/来源 · path/source: <ref>）
+⚠️ 假设待验：<assumption> — 路径未确认，将在 Phase 2 深查
+❌ 假设存疑：<assumption> — 与现有代码/KB/Lark 记录冲突（<具体冲突点>）
+
+发现的潜在风险 · Discovered potential risks:
+⚠️ <risk> — <why this matters>
+```
+
+**调研结论影响下游 · Research conclusions inform downstream:**
+- ✅ 多 → Phase 1.2 PM 清单中可自答项增多，Open Questions 减少
+- ❌ 多 → 可能在 Phase 1 HARD-GATE 前需先拉相关人讨论，或调整风险定级
+- 严重 ❌（PRD 与代码现实根本矛盾）→ **暂停流程**，向用户发出明确警告，确认是否继续
+
+More ✅ → More PM checklist items self-answerable, fewer Open Questions  
+More ❌ → May need stakeholder discussion before Phase 1 HARD-GATE, or adjust risk level  
+Severe ❌ (PRD fundamentally contradicts code reality) → **Pause pipeline**, warn user explicitly, confirm whether to continue
+
 #### 1.1 识别受影响的服务 · Identify Affected Services
 
 参考 `references/repo-map.md` 把需求映射到具体仓库和服务：
@@ -164,9 +246,9 @@ Reference `references/repo-map.md` to map requirements to specific repos and ser
 
 #### 1.2 PM 范围澄清清单 · PM Scope-Clarity Checklist
 
-在问任何技术问题之前，先把你能从 PRD 和代码库中自行推断的信息全列出来（"我假设..." 格式），然后只问**无法自行判断**的事项。
+在问任何技术问题之前，先把你能从 **PRD + Phase 1.0 调研结论（Lark 文档 + KB + 代码探针）** 中自行推断的信息全列出来（"我假设..." 格式），然后只问**无法自行判断**的事项。1.0 调研结论越充分，此处 Open Questions 越少。
 
-Before asking any technical questions, list everything you can infer from the PRD and codebase ("I assume..." format), then only ask about what you **cannot determine yourself**.
+Before asking any technical questions, list everything you can infer from **PRD + Phase 1.0 research (Lark docs + KB + codebase probe)** ("I assume..." format), then only ask about what you **cannot determine yourself**. The richer the Phase 1.0 findings, the fewer Open Questions here.
 
 逐项填写或注明 "PRD 已覆盖"。任何空项必须形成 Open Question 提给用户。
 Fill in each item or mark "covered by PRD". Any blank must become an Open Question to the user.
@@ -198,7 +280,8 @@ The classification result determines the downstream workflow routing:
 **Phase 1 输出格式 · Phase 1 Output Format:**
 
 ```
-我的初步判断（基于 PRD + 代码库扫描）· My initial assessment (based on PRD + codebase scan):
+我的初步判断（基于 PRD + Phase 1.0 调研：Lark 文档 + KB + 代码定向探针）
+My initial assessment (based on PRD + Phase 1.0 research: Lark docs + KB + targeted codebase probe):
 [每条用 "我假设 ..." 开头 · Each starts with "I assume ..."]
 
 仍需你确认的 Open Questions · Still need your confirmation:
@@ -239,15 +322,19 @@ Invalid signals (conversational acknowledgements, NOT approval): "looks good" / 
 
 ---
 
-### Phase 2: 代码库扫描 · Codebase Scan
+### Phase 2: 代码库深度扫描 · Deep Codebase Scan
 
-在扫描之前，先向用户确认仓库路径。不要自行假设目录位置。
-Before scanning, confirm repo paths with the user. Do not assume directory locations.
+Phase 1.0 已完成定向探针（验证 PRD 假设）。Phase 2 的目标是**全量影响面梳理**：找出所有受影响的文件、接口、DB 表、MQ topic，而不仅是验证 PRD 的核心声明。
+
+Phase 1.0 already ran targeted probes (PRD assumption validation). Phase 2 goal is **comprehensive impact mapping**: find all affected files, interfaces, DB tables, MQ topics — not just validating the PRD's core claims.
+
+在扫描之前，确认仓库路径（如 Phase 1.0 中已获取部分路径，此处补充完整）。不要自行假设目录位置。
+Before scanning, confirm repo paths (supplement any paths already gathered in Phase 1.0). Do not assume directory locations.
 
 #### 2.0 确认仓库目录 · Confirm Repo Directories
 
-根据 Phase 1 识别的受影响服务，向用户提问：
-Based on the affected services identified in Phase 1, ask the user:
+根据 Phase 1 识别的受影响服务，向用户提问（Phase 1.0 中已确认的路径无需重复询问）：
+Based on the affected services identified in Phase 1, ask the user (skip paths already confirmed in Phase 1.0):
 
 ```
 我需要扫描以下仓库，请告诉我它们在你本地的路径：
@@ -655,6 +742,8 @@ Cross-phase transition is a natural review point; auto-invoking removes the user
 | "代码扫描耽误时间，我知道在哪改" · "Code scanning wastes time, I know where to make changes" | 扫描的目的是发现你**不知道**的依赖和隐患，不是找你已知的文件 · The point of scanning is to find dependencies and risks you **don't know about**, not to locate files you already know |
 | "先做任务，spec 后面补" · "Start on tasks first, write the spec later" | Spec 的价值在于**在写代码前**暴露设计漏洞，事后补的是文档不是 spec · The value of a spec is exposing design flaws **before writing code** — writing it afterward produces documentation, not a spec |
 | "风险不高，不用走 cross-verified" · "Risk isn't high, don't need cross-verified" | cross-verified 的价值来自独立视角，不是来自"这个功能我觉得危险" · The value of cross-verified comes from independent perspective, not from the developer's own risk assessment |
+| "Lark 文档不用查，PRD 里已经够了" · "No need to check Lark docs, PRD is self-contained" | PRD 通常省略设计依据和历史约束；相关技术方案文档、前置 PRD 往往记录了关键限制。跳过就是在凭空假设 · PRDs typically omit design rationale and historical constraints; related tech docs and predecessor PRDs document critical restrictions. Skipping means reasoning from assumptions instead of evidence |
+| "代码调研等到 Phase 2 再说" · "Defer code research to Phase 2" | Phase 1 的风险定级在没有代码依据时是盲目的；Phase 1.0 的定向探针只需数分钟，代价远低于定级错误导致的返工 · Phase 1 risk classification without code evidence is blind; Phase 1.0 targeted probes take minutes and cost far less than rework caused by mis-classification |
 
 ---
 
