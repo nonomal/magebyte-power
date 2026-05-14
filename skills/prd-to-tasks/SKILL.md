@@ -5,8 +5,8 @@ description: "Translates a PRD / requirements document into codebase-aware engin
 Use this skill for any PRD / requirements document → engineering task conversion scenario. Even if the user just says 'help me analyze this requirement', 'break this PRD into tasks', 'the PM sent a requirements doc', or 'we need to build this feature for the sprint' — invoke this skill immediately, don't ask questions first.
 
 Core difference from generic spec-driven-development:
-(1) Scans the real codebase (bff-service / order-service / platform-order-service etc.) to locate affected services, interfaces, and DB tables;
-(2) Each task produced includes real file paths + line numbers + code pattern references (ID generation, cache double-delete, MQ topic sync, etc.);
+(1) Scans the real codebase (services / interfaces / DB tables / MQ topics) using a user-maintained knowledge base — see ~/.claude/prd-to-tasks/ for your stack-specific mappings;
+(2) Each task produced includes real file paths + line numbers + references to project-specific code patterns from your knowledge base;
 (3) Automatically routes to cross-verified-feature-development or the standard superpowers workflow based on risk level.
 
 Trigger phrases: PRD, requirements document, feature analysis, functional breakdown, sprint tasks, break down tasks, analyze requirements, how do we implement this, how should we build this."
@@ -25,10 +25,10 @@ Trigger phrases: PRD, requirements document, feature analysis, functional breakd
 Generic spec-driven-development produces tasks like "implement user login → modify UserService" — which still require significant time to locate the actual code when executing.
 
 本 skill 写出来的任务是：
-> 在 `order-service/internal/service/booking/booking_service.go:142` 的 `CreateBooking` 方法中加入 feature flag 检查，flag key 为 `platform_order_v2_enabled`，用 `idgen.NextID()` 生成新单据 ID，写 `db.WriteDB`，写后执行 `cache.DoubleDelete(ctx, key)` — `make build && make test`。
+> 在 `order-service/internal/service/booking/booking_service.go:142` 的 `CreateBooking` 方法中加入 feature flag 检查，flag key 为 `new_order_flow_enabled`，使用项目 KB（`~/.claude/prd-to-tasks/service-patterns.md`）中记录的 ID 生成 helper 创建新单据 ID，写入数据库，写后按项目缓存失效协议执行失效 — 然后跑项目约定的 `build` + `test` 命令。
 
 This skill produces tasks like:
-> In the `CreateBooking` method at `order-service/internal/service/booking/booking_service.go:142`, add a feature flag check with key `platform_order_v2_enabled`, use `idgen.NextID()` to generate the new record ID, write to `db.WriteDB`, then execute `cache.DoubleDelete(ctx, key)` after the write — `make build && make test`.
+> In the `CreateBooking` method at `order-service/internal/service/booking/booking_service.go:142`, add a feature flag check with key `new_order_flow_enabled`, use the ID generation helper documented in your project's KB (`~/.claude/prd-to-tasks/service-patterns.md`) to create the new record ID, write to the database, then execute your project's cache invalidation discipline — then run your project's `build` + `test` commands.
 
 ---
 
