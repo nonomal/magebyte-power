@@ -1,93 +1,86 @@
-# Service & Repo Map · 服务与仓库映射
-
-> **Team customization required · 团队必须自定义**: Replace service/repo names below with your actual services. This file is the skill's codebase map — accuracy here directly affects task quality.
+> **Generic example seed.** Copy to `~/.claude/prd-to-tasks/repo-map.md` and customize for your stack. This file is read-only seed bundled with the skill; your real codebase mappings should live in your local KB, not in this open-source repo.
 >
-> 将下方服务和仓库名称替换为你团队的实际服务。这个文件是 skill 的代码库地图 — 这里的准确性直接影响任务质量。
+> **行业通用示例 seed。** 复制到 `~/.claude/prd-to-tasks/repo-map.md` 后按你的技术栈改写。本文件是 skill 仓库自带的只读 seed；你的真实代码库映射应该放在本地 KB，不要进开源仓库。
 
 ---
 
-## 框架代别 · Framework Generations
+# Repo Map · 代码仓库映射
 
-| 框架 · Framework | 仓库示例 · Example Repos | 特征 · Characteristics |
-|-----------------|------------------------|----------------------|
-| **旧框架 · Legacy framework** | bff-service, order-service, platform-order-service, fulfillment-service | 入口 `dock.Run` (generic dock/DI framework)，Consul 配置，`goconf:"section:key"` |
-| **现代 DI 框架 · Modern DI framework (e.g. Kodkod/Wire)** | voucher-service, order-sla-service, procurement-service | wire DI，YAML 配置，`service/<name>/cmd/` 布局 |
+A reference that translates requirement signals (from a PRD) to candidate affected services and repos.
 
----
-
-## 服务 → 仓库 速查 · Service → Repo Quick Reference
-
-### 消费者侧（C 端）· Consumer-Facing
-
-| 业务域 · Domain | 仓库 · Repo | 关键服务 · Key Services | 典型入口 · Typical Entry |
-|----------------|------------|------------------------|------------------------|
-| App / Web BFF | `bff-service` | app-srv, web-srv, admin-srv | `cmd/<srvname>/`, `internal/service/` |
-| 搜索聚合 · Search aggregation | `bff-service` | search-srv | |
-| 用户下单 / 购物车 · Checkout / cart | `bff-service` | app-srv, web-srv | `internal/service/booking/` |
-
-### 订单域 · Order Domain
-
-| 业务域 · Domain | 仓库 · Repo | 关键服务 · Key Services | 典型入口 · Typical Entry |
-|----------------|------------|------------------------|------------------------|
-| 订单核心（创建/状态推进）· Order core (create/state advance) | `order-service` | order-api-service | `cmd/order-api-service/`, `internal/service/booking/` |
-| 退款 / 售后 · Refunds / after-sales | `order-service` | refund-service | `cmd/refund-service/` |
-| 钱包 / 余额 · Wallet / balance | `order-service` | wallet-service | |
-| SLA / 超时处理 · SLA / timeout handling | `order-sla-service` | order-sla-srv | `service/order-sla-srv/` |
-| 支付 · Payments | `payment-service` | payment-srv | `cmd/payment-service/` |
-| 优惠券 · Vouchers | `voucher-service` | voucher-srv | `service/voucher-srv/` |
-
-### 平台履约 · Platform Fulfillment
-
-| 业务域 · Domain | 仓库 · Repo | 关键服务 · Key Services | 典型入口 · Typical Entry |
-|----------------|------------|------------------------|------------------------|
-| 平台订单生命周期 · Platform order lifecycle | `platform-order-service` | platform-order-srv | `cmd/platform-order-srv/`, `internal/service/order_v2/` |
-| 平台履约交付 · Platform fulfillment delivery | `fulfillment-service` | fulfillment-srv | |
-| 采购 / 资源管理 · Procurement / resource management | `procurement-service` | procurement-srv | `service/procurement-srv/` |
-
-### 共享层 · Shared Layer
-
-| 业务域 · Domain | 仓库 · Repo | 说明 · Notes |
-|----------------|------------|-------------|
-| 跨服务 proto / 共享模型 · Cross-service proto / shared models | `shared-models` | 只能新增，不能修改已有 field number；提交到 master · Only additions allowed; never modify existing field numbers; commit to master |
-| Go SDK | `foundation-sdk` | 底层工具库 · Low-level utilities |
-| 第三方库（旧）· Third-party libs (legacy) | `libs/` | GOPATH-style vendor |
+把 PRD 中的需求信号翻译为候选受影响的服务和仓库。
 
 ---
 
-## 常用命令速查 · Common Commands
+## How to use this file · 如何使用
 
-```bash
-# 通用 · Universal
-make build          # 编译 · compile
-make dep            # go mod download
-make lint           # golangci-lint (or project-specific linter wrapper)
-make test           # go test ./...
-make doc            # swagger docs
-make gen            # regenerate protobuf (where applicable)
+When you read a PRD in Phase 0 and identify it as e.g. "user wants to apply a discount code at checkout", scan this table to find the candidate affected services. Customize the table for your own org's service names and code layout.
 
-# 现代 DI 框架服务本地运行 · Modern DI framework service local run
-./bin/<srvname> --config.loader=file --config.file.path=./service/<srvname>/cmd/service-local
-
-# 单服务构建 · Single service build
-CGO_ENABLED=0 go build -o bin/<srvname> ./cmd/<srvname>/main.go
-
-# Wire DI 重生成（现代 DI 框架）· Wire DI regeneration (Modern DI framework)
-wire ./service/<name>/internal/wire
-```
+读完 PRD 并识别出需求（例如"用户在结账时使用优惠码"）后，扫描下表找到候选受影响的服务。请按你自己组织的服务命名和代码布局改写。
 
 ---
 
-## PRD 信号 → 受影响服务 映射启发式 · PRD Signal → Affected Service Heuristics
+## Generic E-commerce / SaaS Service Map · 通用电商 / SaaS 服务映射
 
-| PRD 关键词 · PRD Keywords | 优先检查 · Check First |
-|--------------------------|----------------------|
-| 用户下单、加购物车、商品详情 · User checkout, add to cart, product detail | `bff-service` app-srv/web-srv |
-| 订单状态、取消、改单 · Order status, cancellation, modification | `order-service` order-api-service |
-| 退款、售后、理赔 · Refunds, after-sales, claims | `order-service` refund-service |
-| 钱包、余额、积分 · Wallet, balance, points | `order-service` wallet-service |
-| 支付、收款 · Payments, collections | `payment-service` |
-| 优惠券、折扣 · Vouchers, discounts | `voucher-service` |
-| 平台履约、资源交付 · Platform fulfillment, resource delivery | `platform-order-service` + `fulfillment-service` |
-| 供应商管理、采购 · Supplier management, procurement | `procurement-service` |
-| 超时、SLA · Timeouts, SLA | `order-sla-service` |
-| 跨服务接口变更 · Cross-service interface change | `shared-models`（proto）先动 · move first |
+### Front-end Gateway / BFF · 前端聚合层
+
+| 需求信号 · Requirement Signal | 候选服务 · Candidate Service | 典型代码布局 · Typical Layout |
+|------------------------------|----------------------------|-----------------------------|
+| 用户下单、加购物车、商品详情 · Checkout, add to cart, product detail | `bff-service` (mobile-bff / web-bff) | `cmd/<bff-name>/`, `internal/service/` |
+| 用户主页、个人中心 · User home, profile | `bff-service` | `internal/service/user/` |
+| 搜索聚合、推荐 · Search aggregation, recommendation | `bff-service` or `search-service` | `internal/service/search/` |
+
+### Order Domain · 订单领域
+
+| 需求信号 · Requirement Signal | 候选服务 · Candidate Service | 典型代码布局 · Typical Layout |
+|------------------------------|----------------------------|-----------------------------|
+| 订单创建、状态推进 · Order creation, state advance | `order-service` | `internal/service/order/`, state machine |
+| 退款、售后 · Refunds, after-sales | `refund-service` (or `order-service` sub-module) | `internal/service/refund/` |
+| 钱包、余额、积分 · Wallet, balance, points | `wallet-service` | |
+
+### Promotion · 营销
+
+| 需求信号 · Requirement Signal | 候选服务 · Candidate Service | 典型代码布局 · Typical Layout |
+|------------------------------|----------------------------|-----------------------------|
+| 优惠券、折扣码 · Coupons, discount codes | `voucher-service` or `promotion-service` | |
+| 营销活动、限时折扣 · Campaigns, time-limited discounts | `promotion-service` | |
+
+### Inventory · 库存
+
+| 需求信号 · Requirement Signal | 候选服务 · Candidate Service | 典型代码布局 · Typical Layout |
+|------------------------------|----------------------------|-----------------------------|
+| 库存扣减、回滚、预占 · Stock decrement, rollback, reserve | `inventory-service` | `internal/service/stock/` |
+| 跨仓调拨 · Cross-warehouse transfer | `inventory-service` | |
+
+### Payment · 支付
+
+| 需求信号 · Requirement Signal | 候选服务 · Candidate Service | 典型代码布局 · Typical Layout |
+|------------------------------|----------------------------|-----------------------------|
+| 支付、收款 · Payment, collection | `payment-service` | |
+| 结算、对账 · Settlement, reconciliation | `settlement-service` | |
+
+### Fulfillment · 履约
+
+| 需求信号 · Requirement Signal | 候选服务 · Candidate Service | 典型代码布局 · Typical Layout |
+|------------------------------|----------------------------|-----------------------------|
+| 履约、资源交付 · Fulfillment, resource delivery | `fulfillment-service` | |
+| 物流跟踪 · Logistics tracking | `logistics-service` | |
+
+### Shared Contracts · 跨服务契约
+
+| 需求信号 · Requirement Signal | 候选 · Candidate | 备注 · Notes |
+|------------------------------|------------------|--------------|
+| 跨服务共享 proto / 数据模型 · Cross-service shared proto / model | `shared-contracts` repo (project-specific) | 修改时严守"只新增 field，不修改已有 field number"原则 · "Add-only fields, never modify existing field numbers" |
+
+---
+
+## Customization Checklist · 改写清单
+
+When you copy this to `~/.claude/prd-to-tasks/repo-map.md`, edit:
+
+1. Replace generic service names (`order-service` etc.) with your org's actual service names
+2. Update "典型代码布局" column with your real directory conventions
+3. Add rows for domains specific to your business (e.g. `auth-service` if SaaS, `creator-service` if marketplace)
+4. Delete rows for domains your business doesn't have
+
+把本文件复制到 `~/.claude/prd-to-tasks/repo-map.md` 后，按以上 4 步改写。
