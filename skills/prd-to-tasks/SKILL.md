@@ -98,13 +98,15 @@ After Phase 0 PRD ingestion, this skill detects the KB directory:
 ```
 KB 目录未找到。建议运行：
   mkdir -p ~/.claude/prd-to-tasks
-  cp <skill>/references/*.md ~/.claude/prd-to-tasks/
+  cp ~/.claude/skills/prd-to-tasks/references/*.md ~/.claude/prd-to-tasks/
+  # 如本 skill 通过 plugin 安装，路径形如 ~/.claude/plugins/cache/<plugin>/skills/prd-to-tasks/references/
 然后按你的代码库改写。
 或选择跳过（继续但 Phase 1.1 / Phase 4 检查项能力会受限）。
 
 KB directory not found. Recommended:
   mkdir -p ~/.claude/prd-to-tasks
-  cp <skill>/references/*.md ~/.claude/prd-to-tasks/
+  cp ~/.claude/skills/prd-to-tasks/references/*.md ~/.claude/prd-to-tasks/
+  # If installed via plugin: ~/.claude/plugins/cache/<plugin>/skills/prd-to-tasks/references/
 Then customize for your codebase.
 Or skip (continue but Phase 1.1 / Phase 4 will have reduced capability).
 ```
@@ -615,7 +617,7 @@ After the task list is approved, based on Phase 1.3 risk classification, **write
 |------------------------|-------------------------------------------------|
 | `cross-verified-feature-development` | 校验 `routed-to == self`，读 `spec:` 文件作为 Phase 1 输入，任务清单作为 Phase 2 输入 · Verify `routed-to == self`, read `spec:` file as Phase 1 input, task list as Phase 2 input |
 | `superpowers:writing-plans` | 读 `spec:` 文件作为输入，把任务清单转为 superpowers plan 步骤格式 · Read `spec:` as input, convert task list to superpowers plan steps |
-| `direct` | 用户人肉读 spec + 任务清单直接实施 · User reads spec + tasks and implements directly |
+| `direct` | N/A — 无下游 skill。用户人肉读 spec + 任务清单直接实施 · N/A — no downstream skill. User reads spec + tasks and implements directly |
 
 #### 5.3 Phase 5 输出 · Phase 5 Output
 
