@@ -1,12 +1,6 @@
 ---
 name: cross-verified-feature-development
-description: "Guides agents through a 7-phase rigorous feature development workflow with 4 independent cross-verification passes: systematic self-review, cold-context code review (reviewer sees no design docs — finds design-level blind spots single reviewers miss), behavior-preservation diff, and cross-repo impact scan.
-
-Use this skill — and proactively suggest it even when not explicitly requested — whenever: financial transactions, payments, or refunds are involved; order/inventory state machines have status transitions; distributed locks, concurrency control, or idempotent retry logic is needed; cross-service MQ/RPC contracts or shared proto/model definitions change; online schema migration or dual-write strategy is required; estimated implementation effort ≥ 3 person-days with high cost-of-failure.
-
-Also trigger for: \"implement payment\", \"refund logic\", \"state machine\", \"idempotent\", \"distributed lock\", \"schema migration\", \"microservice interface\", \"concurrent\", \"race condition\", \"dual write\", \"I want to be rigorous\", \"high-stakes feature\", \"I don't want bugs in production\".
-
-Trigger phrases: /cross-verified-workflow, \"cross-verified\", \"交叉验证\", \"严谨工作流\", \"幂等重试\", \"分布式锁\", \"状态机\", \"schema 迁移\", \"跨服务接口\", \"高风险特性\", \"生产事故\", \"资金安全\"."
+description: "The user wants to build backend code correctly and knows (or should know) that mistakes here are expensive. Use when they are implementing — not explaining — any of: payment or refund flows, wallet balance updates, idempotent MQ consumers and deduplication logic, distributed locks for concurrency or oversell prevention, dual-write database migrations, or cross-service state machine refactors. The defining signal: this is an implementation request in a domain where bugs cause financial loss, stuck orders, or production incidents. Always invoke on /cross-verified-workflow. Also invoke when users signal caution: 幂等, 资金安全, 生产事故, 严谨, or English equivalents. Skip for UI/frontend, one-time scripts, documentation, and conceptual questions."
 ---
 
 # Cross-Verified Feature Development

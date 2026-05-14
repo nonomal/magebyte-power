@@ -1,15 +1,6 @@
 ---
 name: prd-to-tasks
-description: "Translates a PRD / requirements document into codebase-aware engineering tasks, then routes to the right development workflow based on risk level.
-
-Use this skill for any PRD / requirements document → engineering task conversion scenario. Even if the user just says 'help me analyze this requirement', 'break this PRD into tasks', 'the PM sent a requirements doc', or 'we need to build this feature for the sprint' — invoke this skill immediately, don't ask questions first.
-
-Core difference from generic spec-driven-development:
-(1) Scans the real codebase (services / interfaces / DB tables / MQ topics) using a user-maintained knowledge base — see ~/.claude/prd-to-tasks/ for your stack-specific mappings;
-(2) Each task produced includes real file paths + line numbers + references to project-specific code patterns from your knowledge base;
-(3) Automatically routes to cross-verified-feature-development or the standard superpowers workflow based on risk level.
-
-Trigger phrases: PRD, requirements document, feature analysis, functional breakdown, sprint tasks, break down tasks, analyze requirements, how do we implement this, how should we build this."
+description: "Use when a user has received a product requirements document (PRD, feature spec, or PM-written requirements) and needs to convert it into engineering work: sprint tasks, technical feasibility review, service/team impact analysis, or implementation planning. The defining signal is an existing product artifact from a PM — not ideation or debugging existing code. Unlike brainstorming (no doc yet) or spec-driven-development (user writes their own spec), this skill's input is always an external requirements document that needs translation into executable developer tasks with real file paths. Invoke immediately without clarifying questions. Also triggers in Chinese: PM发了需求文档、PRD拆任务、技术方案评审、哪些服务受影响、工程师执行的任务清单."
 ---
 
 # PRD → Tasks
