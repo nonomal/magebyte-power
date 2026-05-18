@@ -9,6 +9,75 @@ description: "Use when a user has received a product requirements document (PRD,
 >
 > A structured pipeline from PRD to executable engineering tasks. Core value: **codebase-aware task breakdown** + **risk-driven workflow routing**.
 
+---
+
+## 依赖 · Dependencies
+
+本 skill 是**端到端开发流水线**的后半段。如果你还没有 PRD，先用 `/prd` skill 生成一份。
+
+This skill is the **second half of an end-to-end development pipeline**. If you don't have a PRD yet, use the `/prd` skill to generate one first.
+
+### 安装 `/prd` · Install `/prd`
+
+```bash
+npx skills add github/awesome-copilot@prd -g -y
+```
+
+> 来源 · Source: https://skills.sh/github/awesome-copilot/prd（17.8K installs，MIT License）
+
+### 完整流水线 · Full Pipeline
+
+```
+想法 / 业务需求
+       │
+       ▼
+  /prd  ──────────────────────────────────────────────────────────
+  Phase 1: Discovery 访谈（问题 / 成功指标 / 约束）
+  Phase 2: Analysis & Scoping（用户流 / Non-Goals）
+  Phase 3: 生成 PRD 文档（Executive Summary / User Stories /
+            Technical Specs / Risk Analysis）
+       │
+       │  产出：PRD 文档（Markdown）
+       ▼
+  /prd-to-tasks  ──────────────────────────────────────────────────
+  Phase 0: PRD 摄取（粘贴 / 飞书链接 / 本地文件）
+  Phase 1: 范围澄清 + 风险定级（🔴 / 🟡 / 🟢）
+  Phase 2: 代码库深度扫描（受影响文件 / 接口 / DB / MQ）
+  Phase 3: Spec 生成（设计文档 → docs/superpowers/specs/）
+  Phase 4: 任务拆解（带路径 + 行号的可执行任务清单）
+  Phase 5: 工作流路由（→ cross-verified / superpowers 序列 / direct）
+       │
+       ▼
+  编码实现（由路由决定走哪条 superpowers 流程）
+       │
+       ▼
+  代码审查 → 合并 → 上线
+```
+
+### 如何衔接 · How to Chain `/prd` → `/prd-to-tasks`
+
+**Step 1**：调用 `/prd`，完成三阶段访谈，获得 PRD 文档。
+
+```
+/prd
+```
+
+`/prd` 结束后你会得到一份结构化 Markdown PRD，包含：Executive Summary、User Stories、Technical Specifications、Risks & Roadmap。
+
+**Step 2**：将 PRD 内容喂给 `/prd-to-tasks`。有三种方式：
+
+| 方式 | 操作 |
+|------|------|
+| **粘贴文本**（最常用）| `/prd-to-tasks` 后直接粘贴 PRD 全文 |
+| **本地文件**（已保存 PRD） | `/prd-to-tasks docs/prd/my-feature.md` |
+| **飞书链接**（PRD 在飞书） | `/prd-to-tasks https://feishu.cn/docx/xxx` |
+
+**Step 3**：`/prd-to-tasks` 从 Phase 0 开始，摄取 PRD 后复述核心业务目标，等你确认后进入 Phase 1 范围澄清。
+
+> **关键**：`/prd-to-tasks` 会根据风险定级（Phase 1.3）自动路由到对应的编码工作流，无需你手动选择后续步骤。
+
+---
+
 ## 本 skill 解决什么问题 · What Problem This Skill Solves
 
 通用的 spec-driven-development 写出来的任务是"实现用户登录功能 → 修改 UserService" — 落地时还要花大量时间找代码。
